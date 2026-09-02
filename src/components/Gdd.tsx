@@ -1062,7 +1062,7 @@ function Tecnica() {
 
 /* ------------------------------------ P9 -------------------------------------- */
 
-function Produccion() {
+function Produccion({ onOpenRoadmap }: { onOpenRoadmap?: () => void }) {
   const chanceColor: Record<string, string> = {
     Bajo: "text-lime border-lime/50",
     Medio: "text-cyan border-cyan/50",
@@ -1072,6 +1072,16 @@ function Produccion() {
     <section id="produccion" className="scroll-mt-28 border-t border-line/60 bg-deep/40 py-20 md:py-24">
       <div className="mx-auto max-w-7xl px-4 md:px-8">
         <Head code="P9" kicker="Producción y live-ops" title={<>12 semanas hasta <span className="text-amber">la inauguración</span></>} />
+
+        {onOpenRoadmap && (
+          <button
+            onClick={onOpenRoadmap}
+            className="font-display group mb-12 flex w-full cursor-pointer items-center justify-between gap-4 border-2 border-lime bg-lime/10 px-6 py-5 text-left text-sm tracking-wide text-lime transition-all duration-200 hover:-translate-y-0.5 hover:bg-lime hover:text-deep hover:shadow-[0_0_36px_rgba(168,230,60,0.3)] active:translate-y-0 md:px-8"
+          >
+            <span>PLAN DE OBRA · SEMANA A SEMANA — 60+ tareas, Gantt, hitos y puertas de fase</span>
+            <IconArrow className="h-5 w-5 shrink-0 transition-transform duration-200 group-hover:translate-x-1.5" />
+          </button>
+        )}
 
         <div className="grid gap-12 lg:grid-cols-2 lg:gap-16">
           <Reveal>
@@ -1193,7 +1203,13 @@ function Closing({ onBack }: { onBack: () => void }) {
 
 /* ------------------------------------- view ------------------------------------- */
 
-export default function GddView({ onBack }: { onBack: () => void }) {
+export default function GddView({
+  onBack,
+  onOpenRoadmap,
+}: {
+  onBack: () => void;
+  onOpenRoadmap?: () => void;
+}) {
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
@@ -1212,7 +1228,7 @@ export default function GddView({ onBack }: { onBack: () => void }) {
       <Economia />
       <Monetizacion />
       <Tecnica />
-      <Produccion />
+      <Produccion onOpenRoadmap={onOpenRoadmap} />
       <Closing onBack={onBack} />
     </div>
   );

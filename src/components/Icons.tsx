@@ -1,4 +1,6 @@
-type IconProps = { className?: string };
+import type { CSSProperties } from "react";
+
+type IconProps = { className?: string; style?: CSSProperties };
 
 const base = {
   fill: "none",
@@ -7,6 +9,8 @@ const base = {
   strokeLinecap: "round" as const,
   strokeLinejoin: "round" as const,
 };
+
+
 
 export function IconCube({ className }: IconProps) {
   return (
@@ -29,9 +33,9 @@ export function IconMagnet({ className }: IconProps) {
   );
 }
 
-export function IconKeycard({ className }: IconProps) {
+export function IconKeycard({ className, style }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" className={className} {...base}>
+    <svg viewBox="0 0 24 24" className={className} style={style} {...base}>
       <rect x="2.5" y="5" width="19" height="14" rx="2" />
       <path d="M6 9h4v3H6zM14 9h4M14 12.5h4M6 15.5h6" />
     </svg>

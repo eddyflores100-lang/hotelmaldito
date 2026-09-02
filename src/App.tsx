@@ -10,6 +10,7 @@ import {
   type GameConcept,
 } from "./data/concepts";
 import GddView from "./components/Gdd";
+import RoadmapView from "./components/Roadmap";
 import { useCountUp, useInView } from "./hooks";
 import {
   GameIcon,
@@ -128,23 +129,30 @@ function FloatingCubes() {
 
 /* ----------------------------------- top HUD --------------------------------- */
 
-type View = "lab" | "gdd";
+type View = "lab" | "gdd" | "roadmap";
 
 function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void }) {
-  const links =
-    view === "lab"
-      ? [
-          ["01", "Mercado", "#mercado"],
-          ["02", "Conceptos", "#conceptos"],
-          ["03", "Comparativa", "#comparativa"],
-          ["04", "Veredicto", "#veredicto"],
-        ]
-      : [
-          ["GDD", "Sinopsis", "#sinopsis"],
-          ["GDD", "Escenarios", "#escenarios"],
-          ["GDD", "Técnica", "#tecnica"],
-          ["GDD", "Producción", "#produccion"],
-        ];
+  const linksByView: Record<View, [string, string, string][]> = {
+    lab: [
+      ["01", "Mercado", "#mercado"],
+      ["02", "Conceptos", "#conceptos"],
+      ["03", "Comparativa", "#comparativa"],
+      ["04", "Veredicto", "#veredicto"],
+    ],
+    gdd: [
+      ["GDD", "Sinopsis", "#sinopsis"],
+      ["GDD", "Escenarios", "#escenarios"],
+      ["GDD", "Técnica", "#tecnica"],
+      ["GDD", "Producción", "#produccion"],
+    ],
+    roadmap: [
+      ["PLAN", "Semanas", "#semanas"],
+      ["PLAN", "Gantt", "#gantt"],
+      ["PLAN", "Hitos", "#hitos"],
+      ["PLAN", "Live-ops", "#liveops"],
+    ],
+  };
+  const links = linksByView[view];
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-line/70 bg-deep/85 backdrop-blur-sm">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:px-8">
@@ -183,6 +191,14 @@ function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void })
               }`}
             >
               HOTEL ∞
+            </button>
+            <button
+              onClick={() => onSelect("roadmap")}
+              className={`font-display cursor-pointer border-l border-line px-3 py-1.5 text-[11px] tracking-wider transition-all duration-200 ${
+                view === "roadmap" ? "bg-lime text-deep" : "text-fog hover:text-paper"
+              }`}
+            >
+              PLAN
             </button>
           </div>
           <div className="hidden items-center gap-2 pl-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-lime sm:flex">
@@ -715,7 +731,13 @@ function Compare() {
 
 /* ---------------------------------- veredicto --------------------------------- */
 
-function Verdict({ onOpenGdd }: { onOpenGdd: () => void }) {
+function Verdict({
+  onOpenGdd,
+  onOpenRoadmap,
+}: {
+  onOpenGdd: () => void;
+  onOpenRoadmap: () => void;
+}) {
   return (
     <section id="veredicto" className="relative scroll-mt-20 border-t border-line/60 bg-deep/50 py-24 md:py-32">
       <div className="mx-auto max-w-7xl px-4 md:px-8">
@@ -750,13 +772,21 @@ function Verdict({ onOpenGdd }: { onOpenGdd: () => void }) {
                   </li>
                 ))}
               </ul>
-              <button
-                onClick={onOpenGdd}
-                className="font-display group mt-9 inline-flex cursor-pointer items-center gap-3 border-2 border-amber bg-amber px-7 py-3.5 text-sm text-deep transition-all duration-200 hover:-translate-y-0.5 hover:bg-transparent hover:text-amber hover:shadow-[0_0_32px_rgba(255,160,47,0.35)] active:translate-y-0"
-              >
-                ABRIR EL DOSSIER COMPLETO
-                <IconArrow className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
-              </button>
+              <div className="mt-9 flex flex-wrap items-center gap-4">
+                <button
+                  onClick={onOpenGdd}
+                  className="font-display group inline-flex cursor-pointer items-center gap-3 border-2 border-amber bg-amber px-7 py-3.5 text-sm text-deep transition-all duration-200 hover:-translate-y-0.5 hover:bg-transparent hover:text-amber hover:shadow-[0_0_32px_rgba(255,160,47,0.35)] active:translate-y-0"
+                >
+                  ABRIR EL DOSSIER COMPLETO
+                  <IconArrow className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
+                </button>
+                <button
+                  onClick={onOpenRoadmap}
+                  className="font-display inline-flex cursor-pointer items-center gap-3 border-2 border-lime/70 px-7 py-3.5 text-sm text-lime transition-all duration-200 hover:-translate-y-0.5 hover:bg-lime hover:text-deep hover:shadow-[0_0_32px_rgba(168,230,60,0.3)] active:translate-y-0"
+                >
+                  PLAN DE OBRA · 12 SEMANAS
+                </button>
+              </div>
             </div>
           </Reveal>
 
@@ -843,10 +873,18 @@ export default function App() {
             <Market />
             <Concepts />
             <Compare />
-            <Verdict onOpenGdd={() => switchView("gdd")} />
+            <Verdict
+              onOpenGdd={() => switchView("gdd")}
+              onOpenRoadmap={() => switchView("roadmap")}
+            />
           </>
+        ) : view === "gdd" ? (
+          <GddView onBack={() => switchView("lab")} onOpenRoadmap={() => switchView("roadmap")} />
         ) : (
-          <GddView onBack={() => switchView("lab")} />
+          <RoadmapView
+            onOpenGdd={() => switchView("gdd")}
+            onOpenLab={() => switchView("lab")}
+          />
         )}
       </main>
       <Footer />
