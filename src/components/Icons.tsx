@@ -201,6 +201,166 @@ export function GameIcon({ name, className }: { name: string; className?: string
   }
 }
 
+export function IconBell({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M4 17h16M5 17a7 7 0 0 1 14 0" />
+      <path d="M12 10V7.5M10.5 6h3" />
+      <path d="M2.5 20.5h19" />
+    </svg>
+  );
+}
+
+export function IconBroom({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M14.5 3 10 12" />
+      <path d="M6 21c.5-3.5 1.5-6.5 4-9l4 2c-1 3-3 5.5-8 7Z" />
+      <path d="M9 15.5 7 20M12 17l-1.5 4" />
+    </svg>
+  );
+}
+
+export function IconCart({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <rect x="4" y="6" width="16" height="9" rx="1" />
+      <path d="M4 10h16M9 6V4.5h6V6" />
+      <circle cx="8" cy="18.5" r="1.6" />
+      <circle cx="16" cy="18.5" r="1.6" />
+    </svg>
+  );
+}
+
+export function IconEye({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+      <circle cx="12" cy="12" r="0.8" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function IconDroplet({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M12 3.5c3.5 4.5 6.5 8 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 11.5 8.5 8 12 3.5Z" />
+      <path d="M9 14.5a3 3 0 0 0 2 3" />
+    </svg>
+  );
+}
+
+export function IconFlame({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M12 2.5c1 3.5 5 5.5 5 10a5.8 5.8 0 0 1-10 4 5.6 5.6 0 0 1-1-3.5c0-4.5 4-6 6-10.5Z" />
+      <path d="M12 21a3 3 0 0 1-3-3c0-2 3-3 3-5.5 0 2.5 3 3.5 3 5.5a3 3 0 0 1-3 3Z" />
+    </svg>
+  );
+}
+
+export function IconMirror({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <rect x="6" y="2.5" width="12" height="16" rx="6" />
+      <path d="M9.5 8.5c-.8 1.2-1 2.6-.6 4M9 21.5h6" />
+    </svg>
+  );
+}
+
+export function IconClipboard({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <rect x="5" y="4" width="14" height="17" rx="1.5" />
+      <path d="M9 4.5V3h6v1.5M8.5 10h7M8.5 13.5h7M8.5 17h4" />
+    </svg>
+  );
+}
+
+export function IconElevator({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <rect x="4" y="2.5" width="16" height="19" rx="1" />
+      <path d="M12 2.5v19" />
+      <path d="m8 9 1.8-2L11.5 9M12.5 15l1.8 2 1.7-2" />
+    </svg>
+  );
+}
+
+export function IconDatabase({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <ellipse cx="12" cy="5.5" rx="8" ry="3" />
+      <path d="M4 5.5v13c0 1.7 3.6 3 8 3s8-1.3 8-3v-13" />
+      <path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
+    </svg>
+  );
+}
+
+export function IconCode({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="m8 7-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16" />
+    </svg>
+  );
+}
+
+export function IconShield({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M12 2.5 20 5.5v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10v-6l8-3Z" />
+      <path d="m8.5 11.5 2.5 2.5 4.5-4.5" />
+    </svg>
+  );
+}
+
+export function IconCalendar({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <rect x="3" y="5" width="18" height="16" rx="1.5" />
+      <path d="M3 9.5h18M8 3v4M16 3v4" />
+      <path d="M7.5 13.5h3M13.5 13.5h3M7.5 17h3" />
+    </svg>
+  );
+}
+
+export function IconTarget({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5" />
+      <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function IconBook({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17.5H6.5A2.5 2.5 0 0 0 4 22V4.5Z" />
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+    </svg>
+  );
+}
+
+export function IconStar({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="m12 3 2.7 5.7 6.3.8-4.6 4.3 1.2 6.2L12 17l-5.6 3 1.2-6.2L3 9.5l6.3-.8L12 3Z" />
+    </svg>
+  );
+}
+
+export function IconLayers({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="m12 2.5 9 5-9 5-9-5 9-5Z" />
+      <path d="m3 12.5 9 5 9-5M3 17.5l9 5 9-5" opacity="0.6" />
+    </svg>
+  );
+}
+
 /** Isometric voxel cube rendered as SVG — brand mark & ambient decoration */
 export function VoxelCube({
   className,

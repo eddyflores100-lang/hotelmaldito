@@ -9,6 +9,7 @@ import {
   verdict,
   type GameConcept,
 } from "./data/concepts";
+import GddView from "./components/Gdd";
 import { useCountUp, useInView } from "./hooks";
 import {
   GameIcon,
@@ -127,26 +128,36 @@ function FloatingCubes() {
 
 /* ----------------------------------- top HUD --------------------------------- */
 
-function TopHud() {
-  const links = [
-    ["01", "Mercado", "#mercado"],
-    ["02", "Conceptos", "#conceptos"],
-    ["03", "Comparativa", "#comparativa"],
-    ["04", "Veredicto", "#veredicto"],
-  ];
+type View = "lab" | "gdd";
+
+function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void }) {
+  const links =
+    view === "lab"
+      ? [
+          ["01", "Mercado", "#mercado"],
+          ["02", "Conceptos", "#conceptos"],
+          ["03", "Comparativa", "#comparativa"],
+          ["04", "Veredicto", "#veredicto"],
+        ]
+      : [
+          ["GDD", "Sinopsis", "#sinopsis"],
+          ["GDD", "Escenarios", "#escenarios"],
+          ["GDD", "Técnica", "#tecnica"],
+          ["GDD", "Producción", "#produccion"],
+        ];
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-line/70 bg-deep/85 backdrop-blur-sm">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:px-8">
-        <a href="#top" className="group flex items-center gap-2.5">
+        <button onClick={() => onSelect("lab")} className="group flex cursor-pointer items-center gap-2.5">
           <IconCube className="h-6 w-6 text-cyan transition-transform duration-300 group-hover:rotate-12" />
           <span className="font-display text-sm tracking-wide text-paper">
             GAME<span className="text-amber">LAB</span>
           </span>
-        </a>
-        <nav className="hidden items-center gap-6 md:flex">
+        </button>
+        <nav className="hidden items-center gap-6 lg:flex">
           {links.map(([n, label, href]) => (
             <a
-              key={href}
+              key={`${view}-${href}`}
               href={href}
               className="group text-xs font-semibold uppercase tracking-[0.22em] text-fog transition-colors hover:text-paper"
             >
@@ -155,10 +166,29 @@ function TopHud() {
             </a>
           ))}
         </nav>
-        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-lime">
-          <span className="pulse-dot h-2 w-2 rounded-full bg-lime" />
-          <span className="hidden sm:inline">Servidor en línea</span>
-          <span className="sm:hidden">Online</span>
+        <div className="flex items-center gap-2">
+          <div className="flex border border-line">
+            <button
+              onClick={() => onSelect("lab")}
+              className={`font-display cursor-pointer px-3 py-1.5 text-[11px] tracking-wider transition-all duration-200 ${
+                view === "lab" ? "bg-cyan text-deep" : "text-fog hover:text-paper"
+              }`}
+            >
+              LAB
+            </button>
+            <button
+              onClick={() => onSelect("gdd")}
+              className={`font-display flex cursor-pointer items-center gap-1.5 border-l border-line px-3 py-1.5 text-[11px] tracking-wider transition-all duration-200 ${
+                view === "gdd" ? "bg-amber text-deep" : "text-fog hover:text-paper"
+              }`}
+            >
+              HOTEL ∞
+            </button>
+          </div>
+          <div className="hidden items-center gap-2 pl-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-lime sm:flex">
+            <span className="pulse-dot h-2 w-2 rounded-full bg-lime" />
+            Online
+          </div>
         </div>
       </div>
     </header>
@@ -685,7 +715,7 @@ function Compare() {
 
 /* ---------------------------------- veredicto --------------------------------- */
 
-function Verdict() {
+function Verdict({ onOpenGdd }: { onOpenGdd: () => void }) {
   return (
     <section id="veredicto" className="relative scroll-mt-20 border-t border-line/60 bg-deep/50 py-24 md:py-32">
       <div className="mx-auto max-w-7xl px-4 md:px-8">
@@ -720,6 +750,13 @@ function Verdict() {
                   </li>
                 ))}
               </ul>
+              <button
+                onClick={onOpenGdd}
+                className="font-display group mt-9 inline-flex cursor-pointer items-center gap-3 border-2 border-amber bg-amber px-7 py-3.5 text-sm text-deep transition-all duration-200 hover:-translate-y-0.5 hover:bg-transparent hover:text-amber hover:shadow-[0_0_32px_rgba(255,160,47,0.35)] active:translate-y-0"
+              >
+                ABRIR EL DOSSIER COMPLETO
+                <IconArrow className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
+              </button>
             </div>
           </Reveal>
 
@@ -786,16 +823,31 @@ function Footer() {
 /* ------------------------------------- app ------------------------------------ */
 
 export default function App() {
+  const [view, setView] = useState<View>("lab");
+  const switchView = (v: View) => {
+    if (v === view) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    setView(v);
+    window.scrollTo(0, 0);
+  };
   return (
     <div className="relative min-h-screen">
       <Ambient />
-      <TopHud />
+      <TopHud view={view} onSelect={switchView} />
       <main className="relative z-10">
-        <Opening />
-        <Market />
-        <Concepts />
-        <Compare />
-        <Verdict />
+        {view === "lab" ? (
+          <>
+            <Opening />
+            <Market />
+            <Concepts />
+            <Compare />
+            <Verdict onOpenGdd={() => switchView("gdd")} />
+          </>
+        ) : (
+          <GddView onBack={() => switchView("lab")} />
+        )}
       </main>
       <Footer />
     </div>
