@@ -130,4 +130,10 @@ export const instrucciones = [
     texto:
       "Pulsa Play (F5) para probar en Studio. Cuando el loop funcione, Publish to Roblox y abre la experiencia desde la web o la app.",
   },
+  {
+    paso: "7",
+    titulo: "Licencia AliceLabs",
+    texto:
+      "Todo el código y la documentación llevan Licencia AliceLabs v1.0: puedes implementarlos en tu experiencia de Roblox manteniendo visible el crédito «GameLab by AliceLabs» en la página del juego y en el lobby.",
+  },
 ];
