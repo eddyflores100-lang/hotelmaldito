@@ -604,9 +604,11 @@ function LiveOps() {
 export default function RoadmapView({
   onOpenGdd,
   onOpenLab,
+  onOpenCode,
 }: {
   onOpenGdd: () => void;
   onOpenLab: () => void;
+  onOpenCode?: () => void;
 }) {
   return (
     <div className="relative">
@@ -629,6 +631,14 @@ export default function RoadmapView({
             >
               VER EL GDD COMPLETO
             </button>
+            {onOpenCode && (
+              <button
+                onClick={onOpenCode}
+                className="font-display cursor-pointer border-2 border-cyan px-6 py-3 text-xs tracking-wider text-cyan transition-all duration-200 hover:-translate-y-0.5 hover:bg-cyan hover:text-deep active:translate-y-0"
+              >
+                VER EL CÓDIGO COMPLETO →
+              </button>
+            )}
             <button
               onClick={onOpenLab}
               className="font-display cursor-pointer border-2 border-line px-6 py-3 text-xs tracking-wider text-fog transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan hover:text-cyan active:translate-y-0"

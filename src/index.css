@@ -138,6 +138,24 @@ body {
   transform: none;
 }
 
+/* ---------- Luau syntax tokens ---------- */
+.tok-keyword { color: #ffa02f; font-weight: 600; }
+.tok-string  { color: #a8e63c; }
+.tok-comment { color: #5a6f8f; font-style: italic; }
+.tok-number  { color: #38e1d4; }
+.tok-builtin { color: #6fd3e8; }
+.tok-func    { color: #f2f7ff; }
+.tok-ident   { color: #c6d6ee; }
+.tok-op      { color: #8fa4c2; }
+.tok-plain   { color: #e9f1fc; }
+
+.code-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #223350 transparent;
+}
+.code-scroll::-webkit-scrollbar { height: 8px; width: 8px; }
+.code-scroll::-webkit-scrollbar-thumb { background: #223350; border-radius: 4px; }
+
 /* ---------- utilities ---------- */
 .text-outline {
   -webkit-text-stroke: 1.5px rgba(143, 164, 194, 0.32);

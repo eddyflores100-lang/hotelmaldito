@@ -11,6 +11,7 @@ import {
 } from "./data/concepts";
 import GddView from "./components/Gdd";
 import RoadmapView from "./components/Roadmap";
+import CodebaseView from "./components/Codebase";
 import { useCountUp, useInView } from "./hooks";
 import {
   GameIcon,
@@ -129,7 +130,7 @@ function FloatingCubes() {
 
 /* ----------------------------------- top HUD --------------------------------- */
 
-type View = "lab" | "gdd" | "roadmap";
+type View = "lab" | "gdd" | "roadmap" | "code";
 
 function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void }) {
   const linksByView: Record<View, [string, string, string][]> = {
@@ -150,6 +151,11 @@ function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void })
       ["PLAN", "Gantt", "#gantt"],
       ["PLAN", "Hitos", "#hitos"],
       ["PLAN", "Live-ops", "#liveops"],
+    ],
+    code: [
+      ["SRC", "Archivos", "#codigo"],
+      ["SRC", "Explorer", "#codigo"],
+      ["SRC", "Instalación", "#codigo"],
     ],
   };
   const links = linksByView[view];
@@ -199,6 +205,14 @@ function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void })
               }`}
             >
               PLAN
+            </button>
+            <button
+              onClick={() => onSelect("code")}
+              className={`font-display cursor-pointer border-l border-line px-3 py-1.5 text-[11px] tracking-wider transition-all duration-200 ${
+                view === "code" ? "bg-cyan text-deep" : "text-fog hover:text-paper"
+              }`}
+            >
+              CÓDIGO
             </button>
           </div>
           <div className="hidden items-center gap-2 pl-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-lime sm:flex">
@@ -880,9 +894,16 @@ export default function App() {
           </>
         ) : view === "gdd" ? (
           <GddView onBack={() => switchView("lab")} onOpenRoadmap={() => switchView("roadmap")} />
-        ) : (
+        ) : view === "roadmap" ? (
           <RoadmapView
             onOpenGdd={() => switchView("gdd")}
+            onOpenLab={() => switchView("lab")}
+            onOpenCode={() => switchView("code")}
+          />
+        ) : (
+          <CodebaseView
+            onOpenGdd={() => switchView("gdd")}
+            onOpenRoadmap={() => switchView("roadmap")}
             onOpenLab={() => switchView("lab")}
           />
         )}
