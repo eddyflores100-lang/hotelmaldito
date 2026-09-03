@@ -1,12 +1,16 @@
 import { serverFiles } from "./code-server";
 import { clientFiles } from "./code-client";
+import { graphicsFiles } from "./code-graphics";
 import type { LuauFile } from "./codebase-types";
 
 export type { LuauFile };
 export { faseLabels, semanaLabels } from "./codebase-types";
 
 /** Todo el programa, en el orden exacto en que se construye en Roblox Studio. */
-export const programa: LuauFile[] = [...serverFiles, ...clientFiles];
+export const programa: LuauFile[] = [...serverFiles, ...clientFiles, ...graphicsFiles];
+
+/** Solo los sistemas del pipeline gráfico (Fase 5). */
+export const graficos: LuauFile[] = graphicsFiles;
 
 export const ordenConstruccion: string[] = [
   "types",
@@ -29,6 +33,13 @@ export const ordenConstruccion: string[] = [
   "task-controller",
   "scare-controller",
   "shop-ui",
+  "lighting-director",
+  "postprocess-rig",
+  "camera-director",
+  "material-studio",
+  "water-surface",
+  "vfx-library",
+  "character-polish",
 ];
 
 export function porOrden(): LuauFile[] {
@@ -73,6 +84,13 @@ export const estructuraExplorer = [
   { profundidad: 3, nombre: "TaskController", tipo: "ModuleScript" },
   { profundidad: 2, nombre: "Effects", tipo: "contenedor" },
   { profundidad: 3, nombre: "ScareController", tipo: "ModuleScript" },
+  { profundidad: 3, nombre: "LightingDirector", tipo: "ModuleScript" },
+  { profundidad: 3, nombre: "PostProcessRig", tipo: "ModuleScript" },
+  { profundidad: 3, nombre: "CameraDirector", tipo: "ModuleScript" },
+  { profundidad: 3, nombre: "MaterialStudio", tipo: "ModuleScript" },
+  { profundidad: 3, nombre: "WaterSurface", tipo: "ModuleScript" },
+  { profundidad: 3, nombre: "VFXLibrary", tipo: "ModuleScript" },
+  { profundidad: 3, nombre: "CharacterPolish", tipo: "ModuleScript" },
 ];
 
 export const instrucciones = [

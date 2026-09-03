@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   porOrden,
   programa,
+  graficos,
   estructuraExplorer,
   instrucciones,
   faseLabels,
@@ -151,6 +152,90 @@ function Stat({ valor, etiqueta }: { valor: string; etiqueta: string }) {
   );
 }
 
+/* --------------------- pipeline gráfico (Fase 5) --------------------- */
+
+const ETAPAS_PIPELINE = [
+  { num: "01", titulo: "Geometría PBR", modulo: "MaterialStudio", archivoId: "material-studio", color: "var(--color-cyan)", texto: "Materiales con relieve (normal + roughness maps) y aristas biseladas. Adiós al look cuadrado." },
+  { num: "02", titulo: "Iluminación", modulo: "LightingDirector", archivoId: "lighting-director", color: "var(--color-amber)", texto: "Future Lighting, sombras suaves al 55% y paleta de color que cambia según la tensión de la escena." },
+  { num: "03", titulo: "Atmósfera y agua", modulo: "WaterSurface", archivoId: "water-surface", color: "var(--color-cyan)", texto: "Niebla volumétrica, atmósfera con haz de luz y agua con olas, cáusticas y ondas al caminar." },
+  { num: "04", titulo: "Partículas", modulo: "VFXLibrary", archivoId: "vfx-library", color: "var(--color-lime)", texto: "Polvo en suspensión, brasas de la caldera, auras frías de entidades y esquirlas de espejo." },
+  { num: "05", titulo: "Cámara y peso", modulo: "CameraDirector", archivoId: "camera-director", color: "var(--color-amber)", texto: "FOV que respira con la velocidad, balanceo al caminar e inclinación real al girar." },
+  { num: "06", titulo: "Post-procesado", modulo: "PostProcessRig", archivoId: "postprocess-rig", color: "var(--color-lime)", texto: "Grading de cine, bloom controlado, depth of field y aberración cromática en los sustos." },
+];
+
+function PipelineGrafico({ onVer }: { onVer: (id: string) => void }) {
+  return (
+    <section className="relative overflow-hidden border-t border-line/60 bg-deep/50 py-16 md:py-24">
+      {/* halo ambiental */}
+      <div className="pointer-events-none absolute -top-40 left-1/3 h-[30rem] w-[30rem] rounded-full bg-cyan/10 blur-[120px]" />
+      <div className="pointer-events-none absolute -bottom-40 right-1/4 h-[26rem] w-[26rem] rounded-full bg-amber/10 blur-[120px]" />
+
+      <div className="relative mx-auto max-w-7xl px-4 md:px-8">
+        <div className="mb-10 flex flex-col gap-3 md:mb-14 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-cyan">
+              Fase 5 · Gráficos de primera calidad
+            </p>
+            <h2 className="font-display mt-3 text-3xl leading-[1.02] text-paper md:text-5xl">
+              Del blocky al <span className="text-cyan">fotorrealista</span>
+            </h2>
+          </div>
+          <p className="max-w-md text-sm leading-relaxed text-fog">
+            Seis etapas de render que transforman salas planas en espacios con volumen,
+            profundidad y peso físico. Cada etapa es un módulo Luau listo para pegar.
+          </p>
+        </div>
+
+        {/* línea del pipeline */}
+        <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+          {ETAPAS_PIPELINE.map((etapa, i) => (
+            <button
+              key={etapa.num}
+              onClick={() => onVer(etapa.archivoId)}
+              className="group relative flex flex-col border border-line bg-panel/60 p-5 text-left transition-all duration-300 hover:-translate-y-1.5 hover:border-cyan/50 hover:shadow-[0_16px_40px_-18px_rgba(56,225,212,0.35)]"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-display text-2xl text-line transition-colors duration-300 group-hover:text-cyan">
+                  {etapa.num}
+                </span>
+                <span className="h-2.5 w-2.5 rounded-full transition-transform duration-300 group-hover:scale-150" style={{ background: etapa.color }} />
+              </div>
+              <p className="font-display mt-4 text-sm tracking-wide text-paper">{etapa.titulo}</p>
+              <p className="mt-1 font-mono text-[11px] text-cyan/80">{etapa.modulo}</p>
+              <p className="mt-3 text-xs leading-relaxed text-fog">{etapa.texto}</p>
+              {i < ETAPAS_PIPELINE.length - 1 && (
+                <span className="absolute -right-3 top-1/2 z-10 hidden -translate-y-1/2 text-cyan/60 xl:block">→</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* módulos gráficos */}
+        <div className="mt-14">
+          <p className="font-display mb-5 text-sm tracking-wider text-paper">
+            LOS 7 MÓDULOS DEL PIPELINE
+          </p>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {graficos.map((g) => (
+              <button
+                key={g.id}
+                onClick={() => onVer(g.id)}
+                className="group flex items-start gap-3 border border-line bg-panel/50 p-4 text-left transition-all duration-200 hover:border-lime/50 hover:bg-panel2"
+              >
+                <span className="mt-0.5 text-lime">⬢</span>
+                <span>
+                  <span className="font-display block text-[13px] text-paper group-hover:text-lime">{g.name}</span>
+                  <span className="mt-1 block text-[11px] leading-relaxed text-fog">{g.description}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ------------------------------- vista ------------------------------- */
 
 export default function CodebaseView({
@@ -223,7 +308,7 @@ export default function CodebaseView({
       </section>
 
       {/* explorador + código */}
-      <section className="py-14 md:py-16">
+      <section id="codigo" className="scroll-mt-20 py-14 md:py-16">
         <div className="mx-auto max-w-7xl px-4 md:px-8">
           <div className="grid gap-8 lg:grid-cols-[300px_minmax(0,1fr)]">
             {/* lista de archivos */}
@@ -354,6 +439,15 @@ export default function CodebaseView({
           </div>
         </div>
       </section>
+
+      {/* pipeline gráfico */}
+      <PipelineGrafico
+        onVer={(id) => {
+          const destino = archivos.find((a) => a.id === id) ?? archivos.find((a) => a.id.startsWith(id));
+          if (destino) setSelId(destino.id);
+          document.getElementById("codigo")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }}
+      />
 
       {/* árbol explorer + instrucciones */}
       <section className="border-t border-line/60 bg-deep/40 py-16 md:py-20">
