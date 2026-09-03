@@ -274,6 +274,138 @@ export function signTexture(text: string, bg: string, fg: string, sub?: string):
   return tex;
 }
 
+/* --------------------------- papel pintado --------------------------- */
+
+export function wallpaperTexture(base: string, accent: string): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 256; c.height = 256;
+  const g = c.getContext("2d")!;
+  g.fillStyle = base;
+  g.fillRect(0, 0, 256, 256);
+  // rayas verticales sutiles
+  for (let x = 0; x < 256; x += 32) {
+    g.fillStyle = "rgba(255,255,255,0.03)";
+    g.fillRect(x, 0, 14, 256);
+  }
+  // damasco simple (rombos + puntos)
+  g.strokeStyle = accent;
+  g.globalAlpha = 0.22;
+  g.lineWidth = 2.2;
+  for (let y = 0; y < 256; y += 64) {
+    for (let x = 0; x < 256; x += 64) {
+      const ox = (y / 64) % 2 ? 32 : 0;
+      g.beginPath();
+      g.moveTo(x + ox, y + 8);
+      g.quadraticCurveTo(x + ox + 16, y + 26, x + ox, y + 44);
+      g.quadraticCurveTo(x + ox - 16, y + 26, x + ox, y + 8);
+      g.stroke();
+      g.beginPath();
+      g.arc(x + ox, y + 54, 2.4, 0, Math.PI * 2);
+      g.fillStyle = accent;
+      g.fill();
+    }
+  }
+  g.globalAlpha = 1;
+  // polvo
+  for (let i = 0; i < 700; i++) {
+    g.fillStyle = `rgba(0,0,0,${rnd(0.02, 0.06)})`;
+    g.fillRect(rnd(0, 256), rnd(0, 256), 1.5, 1.5);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+/* ------------------------------- parqué ------------------------------- */
+
+export function parquetTexture(): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  const g = c.getContext("2d")!;
+  const pl = 32;
+  for (let y = 0; y < 8; y++) {
+    for (let x = 0; x < 8; x++) {
+      const shade = ((x + y) % 2 ? 0.5 : 0) + rnd(-0.08, 0.08);
+      const l = Math.round(96 + shade * 90);
+      g.fillStyle = `hsl(${irnd(24, 34)}, ${irnd(38, 52)}%, ${irnd(18, 30)}%)`;
+      g.fillRect(x * pl, y * pl, pl, pl);
+      g.strokeStyle = "rgba(20,10,4,0.5)";
+      g.lineWidth = 1.4;
+      g.strokeRect(x * pl + 0.7, y * pl + 0.7, pl - 1.4, pl - 1.4);
+      g.strokeStyle = "rgba(255,220,170,0.08)";
+      g.beginPath();
+      g.moveTo(x * pl, y * pl + pl / 2);
+      g.lineTo(x * pl + pl, y * pl + pl / 2);
+      g.stroke();
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 8;
+  return tex;
+}
+
+/* ------------------------- baldosas (baño) ------------------------- */
+
+export function tileTexture(): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#b8c6c4";
+  g.fillRect(0, 0, 256, 256);
+  const t = 64;
+  for (let y = 0; y < 4; y++) {
+    for (let x = 0; x < 4; x++) {
+      const l = irnd(0, 3);
+      g.fillStyle = l === 0 ? "#aebcbc" : l === 1 ? "#c2cfcd" : "#9fb0ae";
+      g.fillRect(x * t + 2, y * t + 2, t - 4, t - 4);
+      g.strokeStyle = "rgba(50,70,70,0.5)";
+      g.lineWidth = 3;
+      g.strokeRect(x * t + 2, y * t + 2, t - 4, t - 4);
+      // brillo
+      g.fillStyle = "rgba(255,255,255,0.16)";
+      g.beginPath();
+      g.moveTo(x * t + 6, y * t + t - 10);
+      g.lineTo(x * t + 20, y * t + 6);
+      g.lineTo(x * t + 30, y * t + 6);
+      g.lineTo(x * t + 14, y * t + t - 10);
+      g.fill();
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 8;
+  return tex;
+}
+
+/* ------------------------- lingotes / oro ------------------------- */
+
+export function goldMaterial(): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color: "#f0c244",
+    metalness: 0.95,
+    roughness: 0.22,
+    emissive: "#7a5210",
+    emissiveIntensity: 0.35,
+  });
+}
+
+export function gemMaterial(color = "#3ce0c8"): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color,
+    metalness: 0.2,
+    roughness: 0.05,
+    emissive: color,
+    emissiveIntensity: 1.6,
+    transparent: true,
+    opacity: 0.9,
+  });
+}
+
 /* ------------------------------ limpieza ------------------------------ */
 
 export function disposeObject(root: THREE.Object3D): void {

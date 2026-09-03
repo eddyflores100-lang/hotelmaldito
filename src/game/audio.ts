@@ -166,6 +166,22 @@ export class GameAudio {
     this.tone(65, 1.2, "sawtooth", 0.2, 48);
     this.noise(1.1, 0.16, 260);
   }
+  shatter(): void {
+    this.noise(0.16, 0.28, 3200);
+    this.tone(720, 0.14, "triangle", 0.08, 240);
+  }
+  teleport(): void {
+    this.tone(900, 0.22, "sine", 0.09, 180);
+    this.tone(180, 0.18, "sine", 0.06, 720, 0.16);
+  }
+  trapSnap(): void {
+    this.noise(0.06, 0.32, 1800);
+    this.tone(140, 0.09, "square", 0.12, 70);
+  }
+  throwSfx(): void {
+    this.noise(0.1, 0.1, 2200);
+    this.tone(520, 0.12, "sine", 0.05, 260);
+  }
 
   /* --------------------------- ambiente --------------------------- */
 

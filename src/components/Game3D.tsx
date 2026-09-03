@@ -7,10 +7,12 @@ import {
   Coins, Cross, Crosshair, Expand, Gamepad2, Heart, KeyRound, Magnet,
   MousePointer2, Pause, Play, RotateCcw, Shield, ShieldAlert, Sword,
   Target, Volume2, VolumeX, Wind, Zap, Swords, Trophy,
+  Zap as ZapTrap, Sun,
   type LucideIcon,
 } from "lucide-react";
 import { Game, type GameStats, type HudState, type UpgradeCard } from "../game/Game";
 import type { BuildKind } from "../game/builds";
+import type { MapData } from "../game/world";
 
 const HEX = {
   lime: "#a8e63c",
@@ -32,6 +34,8 @@ const BUILD_SLOTS: { kind: BuildKind; icon: LucideIcon; label: string; cost: num
   { kind: "barricade", icon: Shield, label: "BARRICADA", cost: 25 },
   { kind: "turret", icon: Crosshair, label: "TORRETA", cost: 60 },
   { kind: "medkit", icon: Cross, label: "BOTIQUÍN", cost: 40 },
+  { kind: "trap", icon: ZapTrap, label: "TRAMPA", cost: 35 },
+  { kind: "totem", icon: Sun, label: "VELADOR", cost: 50 },
 ];
 
 export default function Game3D() {
@@ -189,6 +193,9 @@ export default function Game3D() {
               <div className="rounded-lg border border-[#223350] bg-[#0f1b31]/85 px-2.5 py-1 font-display text-[10px] text-[#8fa4c2]">
                 {hud.floorCode} · {hud.floorName}
               </div>
+              <div className="rounded-lg border border-[#e9b23c]/30 bg-[#0f1b31]/85 px-2.5 py-0.5 text-[10px] font-bold text-[#e9b23c]">
+                {hud.roomName} · {hud.roomsExplored}/{hud.roomsTotal} salas
+              </div>
               {phase === "night" && (
                 <div className="rounded-lg bg-[#3a0d0d]/90 border border-[#ff5a4e]/40 px-2.5 py-0.5 text-[10px] font-bold" style={{ color: HEX.red }}>
                   ANOMALÍAS: {hud.enemiesAlive}
@@ -224,6 +231,7 @@ export default function Game3D() {
               >
                 {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
               </button>
+              <MiniMap hud={hud} />
             </div>
           </div>
 
@@ -260,7 +268,7 @@ export default function Game3D() {
                   <button
                     key={slot.kind}
                     onClick={() => gameRef.current?.selectBuild(active ? null : slot.kind)}
-                    className={`relative flex w-[76px] sm:w-[92px] flex-col items-center gap-0.5 rounded-xl border px-1 py-2 backdrop-blur transition-all ${
+                    className={`relative flex w-[60px] sm:w-[92px] flex-col items-center gap-0.5 rounded-xl border px-1 py-2 backdrop-blur transition-all ${
                       active ? "scale-105" : afford ? "hover:scale-105" : "opacity-45"
                     }`}
                     style={{
@@ -338,16 +346,17 @@ export default function Game3D() {
               NOCHE INFINITA
             </div>
             <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-[#c9d6ec]">
-              Explora habitaciones, saquea monedas, <b className="text-[#e9f1fc]">construye defensas</b> y
-              sobrevive a las <b style={{ color: HEX.red }}>3 oleadas de anomalías</b> de cada noche.
-              Sube al ascensor… los pisos nunca terminan.
+              Explora el GRAND HOTEL: lobby con fuente, <b className="text-[#e9f1fc]">12 habitaciones enormes</b>,
+              salón de baile, cocina, suite ∞ y una <b style={{ color: HEX.gold }}>BÓVEDA con 2 llaves</b>. Saquea
+              tesoros, rompe jarrones, <b className="text-[#e9f1fc]">construye 5 tipos de defensas</b> y sobrevive
+              a las <b style={{ color: HEX.red }}>3 oleadas</b> de 9 clases de monstruos. Los pisos nunca terminan.
             </p>
             <div className="mt-5 grid grid-cols-2 gap-2 text-left text-[11px] sm:grid-cols-4">
               {[
                 { icon: Gamepad2, txt: "WASD moverse · ratón cámara" },
                 { icon: Swords, txt: "Clic / J: golpe de escoba" },
-                { icon: Shield, txt: "1·2·3: construir defensas" },
-                { icon: MousePointer2, txt: "E: puertas · cofres · ascensor" },
+                { icon: Shield, txt: "1–5: barricada, torreta, botiquín, trampa, velador" },
+                { icon: MousePointer2, txt: "E: puertas · cofres · bóveda · ascensor" },
               ].map((c, i) => (
                 <div key={i} className="flex items-start gap-2 rounded-lg border border-[#223350] bg-[#0f1b31]/80 p-2">
                   <c.icon size={14} style={{ color: HEX.cyan, flexShrink: 0 }} />
@@ -497,5 +506,94 @@ function TouchBtn({
     >
       {label}
     </button>
+  );
+}
+
+/* ============================== minimapa ============================== */
+
+function MiniMap({ hud }: { hud: HudState }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const cv = ref.current;
+    if (!cv || !hud.map) return;
+    const map: MapData = hud.map;
+    const g = cv.getContext("2d")!;
+    const CW = cv.width, CH = cv.height;
+    const b = map.bounds;
+    const bw = b.maxX - b.minX, bh = b.maxZ - b.minZ;
+    const s = Math.min((CW - 8) / bw, (CH - 8) / bh);
+    const ox = (CW - bw * s) / 2;
+    const oy = (CH - bh * s) / 2;
+    const px = (x: number) => ox + (x - b.minX) * s;
+    const py = (z: number) => oy + (z - b.minZ) * s;
+
+    g.clearRect(0, 0, CW, CH);
+    g.fillStyle = "rgba(8,14,26,0.88)";
+    g.beginPath();
+    g.roundRect(0, 0, CW, CH, 10);
+    g.fill();
+
+    const rect = (r: { x1: number; z1: number; x2: number; z2: number }, fill: string, stroke: string) => {
+      g.fillStyle = fill;
+      g.strokeStyle = stroke;
+      g.lineWidth = 1;
+      g.fillRect(px(r.x1), py(r.z1), (r.x2 - r.x1) * s, (r.z2 - r.z1) * s);
+      g.strokeRect(px(r.x1), py(r.z1), (r.x2 - r.x1) * s, (r.z2 - r.z1) * s);
+    };
+
+    // hub + alas
+    rect(map.hub, "#14243d", "#2c4266");
+    for (const w of map.wings) rect(w, "#14243d", "#2c4266");
+
+    // habitaciones
+    for (const r of map.rooms) {
+      const isVault = r.special === "BÓVEDA";
+      const isSpecial = !!r.special;
+      const stroke = isVault ? "#e9b23c" : isSpecial ? "#8fa4c2" : "#33507a";
+      rect(r, "#0e1930", stroke);
+      g.fillStyle = isVault ? "#e9b23c" : "#38e1d4";
+      g.fillRect(px(r.door.x) - 1.5, py(r.door.z) - 1.5, 3, 3);
+    }
+
+    // ascensor
+    g.fillStyle = "#a8e63c";
+    g.fillRect(px(map.elevator.x) - 2.5, py(map.elevator.z) - 2.5, 5, 5);
+
+    // cofres
+    for (const c of hud.chestPts) {
+      g.fillStyle = "#f4c542";
+      g.beginPath();
+      g.arc(px(c.x), py(c.z), 2, 0, Math.PI * 2);
+      g.fill();
+    }
+
+    // enemigos
+    for (const e of hud.enemyPts) {
+      g.fillStyle = e.elite ? "#f4c542" : "#ff5a4e";
+      g.beginPath();
+      g.arc(px(e.x), py(e.z), 2, 0, Math.PI * 2);
+      g.fill();
+    }
+
+    // jugador (flecha)
+    const jx = px(hud.playerPt.x), jy = py(hud.playerPt.z);
+    const dirX = Math.sin(hud.playerPt.ang), dirZ = Math.cos(hud.playerPt.ang);
+    g.fillStyle = "#a8e63c";
+    g.beginPath();
+    g.moveTo(jx + dirX * 5, jy + dirZ * 5);
+    g.lineTo(jx - dirZ * 3 - dirX * 2, jy + dirX * 3 - dirZ * 2);
+    g.lineTo(jx + dirZ * 3 - dirX * 2, jy - dirX * 3 - dirZ * 2);
+    g.closePath();
+    g.fill();
+  }, [hud]);
+
+  return (
+    <canvas
+      ref={ref}
+      width={216}
+      height={148}
+      className="hidden w-[144px] rounded-[10px] border border-[#223350] sm:block sm:w-[178px]"
+    />
   );
 }

@@ -1,22 +1,26 @@
 /* ============================================================
-   HOTEL ∞ INFINITO — Construcciones defensivas: barricadas,
-   torretas y botiquines colocables por el jugador.
+   HOTEL ∞ INFINITO — Construcciones defensivas (5):
+   barricada, torreta, botiquín, trampa de pinchos y velador.
    ============================================================ */
 import * as THREE from "three";
 import { disposeObject } from "./util";
 
-export type BuildKind = "barricade" | "turret" | "medkit";
+export type BuildKind = "barricade" | "turret" | "medkit" | "trap" | "totem";
 
 export const BUILD_COST: Record<BuildKind, number> = {
   barricade: 25,
   turret: 60,
   medkit: 40,
+  trap: 35,
+  totem: 50,
 };
 
 export const BUILD_INFO: Record<BuildKind, { name: string; desc: string; color: string }> = {
   barricade: { name: "BARRICADA", desc: "Muro de maletas. Bloquea a las anomalías.", color: "#e9b23c" },
   turret: { name: "TORRETA", desc: "Dispara sola a las anomalías cercanas.", color: "#38e1d4" },
   medkit: { name: "BOTIQUÍN", desc: "Estación de curación (+30 vida).", color: "#ff5a4e" },
+  trap: { name: "TRAMPA", desc: "Pinchos: hiere a quienes la pisan (12 usos).", color: "#ffa02f" },
+  totem: { name: "VELADOR", desc: "Aura sagrada: ralentiza enemigos y te cura.", color: "#b8e0ff" },
 };
 
 export type Buildable = {
@@ -31,8 +35,10 @@ export type Buildable = {
   cd?: number;
   range?: number;
   dmg?: number;
-  // botiquín
+  // botiquín / velador
   recharge?: number;
+  // trampa
+  uses?: number;
   // barricada
   aabb?: { minX: number; maxX: number; minZ: number; maxZ: number };
 };
@@ -51,10 +57,29 @@ export function makeGhostMesh(kind: BuildKind): THREE.Group {
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.4, 0.7), mat);
     head.position.y = 0.62;
     g.add(head);
-  } else {
+  } else if (kind === "medkit") {
     const m = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.8, 0.5), mat);
     m.position.y = 0.4;
     g.add(m);
+  } else if (kind === "trap") {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.12, 1.3), mat);
+    m.position.y = 0.06;
+    g.add(m);
+    for (let i = 0; i < 4; i++) {
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.3, 6), mat);
+      spike.position.set((i % 2 ? 0.3 : -0.3), 0.24, i < 2 ? 0.3 : -0.3);
+      g.add(spike);
+    }
+  } else {
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 0.3, 10), mat);
+    base.position.y = 0.15;
+    g.add(base);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.5, 8), mat);
+    pole.position.y = 1.0;
+    g.add(pole);
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), mat);
+    orb.position.y = 1.95;
+    g.add(orb);
   }
   return g;
 }
@@ -135,7 +160,7 @@ export function buildStructure(kind: BuildKind, pos: THREE.Vector3, difficulty: 
     b.cd = 0;
     b.range = 9;
     b.dmg = 12;
-  } else {
+  } else if (kind === "medkit") {
     b.maxHp = 70;
     b.hp = b.maxHp;
     b.recharge = 0;
@@ -159,6 +184,58 @@ export function buildStructure(kind: BuildKind, pos: THREE.Vector3, difficulty: 
     );
     legs.position.y = 0.06;
     g.add(legs);
+  } else if (kind === "trap") {
+    b.maxHp = 999; // las trampas no se dañan: tienen usos
+    b.hp = b.maxHp;
+    b.uses = 12;
+    b.cd = 0;
+    const plate = new THREE.Mesh(
+      new THREE.BoxGeometry(1.3, 0.1, 1.3),
+      new THREE.MeshStandardMaterial({ color: "#3a4356", roughness: 0.4, metalness: 0.6 })
+    );
+    plate.position.y = 0.05;
+    plate.receiveShadow = true;
+    g.add(plate);
+    const spikeMat = new THREE.MeshStandardMaterial({ color: "#c9ccd4", metalness: 0.9, roughness: 0.2, emissive: "#ffa02f", emissiveIntensity: 0.25 });
+    for (let i = 0; i < 5; i++) {
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.34, 6), spikeMat);
+      spike.position.set(-0.42 + (i % 3) * 0.42, 0.24, i < 2 ? -0.3 : i < 4 ? 0.3 : 0);
+      spike.castShadow = true;
+      g.add(spike);
+    }
+  } else {
+    // velador santo
+    b.maxHp = 60;
+    b.hp = b.maxHp;
+    b.recharge = 0;
+    b.cd = 0;
+    const base = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.32, 0.44, 0.3, 10),
+      new THREE.MeshStandardMaterial({ color: "#6b4a2a", roughness: 0.6 })
+    );
+    base.position.y = 0.15;
+    base.castShadow = true;
+    g.add(base);
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.055, 0.08, 1.55, 8),
+      new THREE.MeshStandardMaterial({ color: "#8a6a2f", metalness: 0.8, roughness: 0.3 })
+    );
+    pole.position.y = 1.0;
+    g.add(pole);
+    const orb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.3, 14, 12),
+      new THREE.MeshStandardMaterial({ color: "#dfe9ff", emissive: "#b8e0ff", emissiveIntensity: 2.2, roughness: 0.2 })
+    );
+    orb.position.y = 1.98;
+    g.add(orb);
+    const halo = new THREE.Mesh(
+      new THREE.TorusGeometry(0.42, 0.03, 8, 20),
+      new THREE.MeshStandardMaterial({ color: "#f4c542", emissive: "#f4c542", emissiveIntensity: 1.6 })
+    );
+    halo.rotation.x = Math.PI / 2;
+    halo.position.y = 2.42;
+    g.add(halo);
+    b.head = orb as unknown as THREE.Group;
   }
 
   return b;
@@ -168,24 +245,26 @@ export function disposeBuildable(b: Buildable): void {
   disposeObject(b.group);
 }
 
-/* proyectiles de torreta */
+/* proyectiles (torreta aliada / camarista hostil) */
 export type Projectile = {
   mesh: THREE.Mesh;
   vel: THREE.Vector3;
   life: number;
   dmg: number;
+  hostile?: boolean;
 };
 
-export function makeProjectile(pos: THREE.Vector3, dir: THREE.Vector3, dmg: number): Projectile {
+export function makeProjectile(pos: THREE.Vector3, dir: THREE.Vector3, dmg: number, hostile = false): Projectile {
   const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(0.09, 8, 6),
-    new THREE.MeshBasicMaterial({ color: "#8dff5e" })
+    new THREE.SphereGeometry(hostile ? 0.14 : 0.09, 8, 6),
+    new THREE.MeshBasicMaterial({ color: hostile ? "#7dffa8" : "#8dff5e" })
   );
   mesh.position.copy(pos);
   return {
     mesh,
-    vel: dir.multiplyScalar(16),
-    life: 1.1,
+    vel: dir.multiplyScalar(hostile ? 9.5 : 16),
+    life: hostile ? 2.4 : 1.1,
     dmg,
+    hostile,
   };
 }

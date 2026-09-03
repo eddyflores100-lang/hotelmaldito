@@ -5,7 +5,7 @@
    ============================================================ */
 import * as THREE from "three";
 import { Avatar } from "./avatar";
-import { buildWorld, makeKeyMesh, type AABB, type LootItem, type WorldRefs } from "./world";
+import { buildWorld, makeKeyMesh, type AABB, type DoorInfo, type LootItem, type MapData, type WorldRefs, pointInZone } from "./world";
 import { floorThemeFor } from "./hotel";
 import { Enemy, type EnemyType, type EnemyWorld, type ObstacleRef } from "./enemy";
 import {
@@ -41,6 +41,13 @@ export type HudState = {
   prompt: string | null;
   missions: HudMission[];
   dashReady: number; // 0..1
+  roomName: string;
+  roomsExplored: number;
+  roomsTotal: number;
+  map: MapData | null;
+  playerPt: { x: number; z: number; ang: number };
+  enemyPts: { x: number; z: number; elite: boolean }[];
+  chestPts: { x: number; z: number }[];
 };
 
 export type GameStats = {
@@ -64,9 +71,9 @@ export type GameCallbacks = {
   onGameOver: (stats: GameStats) => void;
 };
 
-const DAY_LEN = 45;
+const DAY_LEN = 60;
 const WAVES_PER_NIGHT = 3;
-const BEST_KEY = "hotelinf-best-v3";
+const BEST_KEY = "hotelinf-best-v4";
 
 type Upgrade = UpgradeCard & { apply: () => void };
 
@@ -196,7 +203,7 @@ export class Game {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.18;
 
-    this.camera = new THREE.PerspectiveCamera(58, 1, 0.1, 90);
+    this.camera = new THREE.PerspectiveCamera(58, 1, 0.1, 130);
     this.scene.add(this.camera);
 
     this.hemi = new THREE.HemisphereLight(new THREE.Color("#5a72a8"), new THREE.Color("#12182a"), 1.5);
@@ -205,10 +212,10 @@ export class Game {
     this.moon.position.set(-9, 12, 7);
     this.moon.castShadow = true;
     this.moon.shadow.mapSize.set(this.quality === "high" ? 2048 : 1024, this.quality === "high" ? 2048 : 1024);
-    this.moon.shadow.camera.left = -18;
-    this.moon.shadow.camera.right = 18;
-    this.moon.shadow.camera.top = 18;
-    this.moon.shadow.camera.bottom = -18;
+    this.moon.shadow.camera.left = -36;
+    this.moon.shadow.camera.right = 36;
+    this.moon.shadow.camera.top = 36;
+    this.moon.shadow.camera.bottom = -36;
     this.moon.shadow.bias = -0.003;
     this.scene.add(this.moon);
     const fill = new THREE.AmbientLight(new THREE.Color("#2e3d5e"), 0.8);
@@ -233,6 +240,8 @@ export class Game {
       barricade: makeGhostMesh("barricade"),
       turret: makeGhostMesh("turret"),
       medkit: makeGhostMesh("medkit"),
+      trap: makeGhostMesh("trap"),
+      totem: makeGhostMesh("totem"),
     };
     for (const k of Object.keys(this.ghosts) as BuildKind[]) {
       this.ghosts[k].visible = false;
@@ -299,10 +308,10 @@ export class Game {
 
     const s = this.world.playerStart;
     this.playerGroup.position.set(s.x, 0, s.z);
-    this.facing = Math.PI / 2;
+    this.facing = Math.PI; // mirando al norte (ascensor)
     this.playerGroup.rotation.y = this.facing;
-    this.camYaw = Math.PI / 2 + Math.PI; // cámara detrás del jugador
-    this.camPos.set(s.x + 5, 3.4, s.z + 3);
+    this.camYaw = 0; // cámara detrás (sur)
+    this.camPos.set(s.x, 3.4, s.z + 5);
     this.fadeK = 1;
 
     this.board.seedForFloor(index);
@@ -337,6 +346,21 @@ export class Game {
       phaseLabel = "6:00 AM · PISO SUPERADO";
       progress = 1;
     }
+    // sala actual
+    const pp = this.playerGroup.position;
+    let roomName = "LOBBY ∞";
+    for (const z of this.world.zones) {
+      if (!pointInZone(z, pp.x, pp.z)) continue;
+      if (z.kind === "room") {
+        const r = this.world.rooms[z.idx];
+        roomName = r.special ?? r.name;
+      } else if (z.kind === "corridor") {
+        roomName = z.wing === "west" ? "PASILLO OESTE" : z.wing === "east" ? "PASILLO ESTE" : "PASILLO NORTE";
+      } else {
+        roomName = "LOBBY ∞";
+      }
+      break;
+    }
     this.cb.onHud({
       phase: this.phase,
       hp: Math.max(0, Math.round(this.hp)),
@@ -358,6 +382,13 @@ export class Game {
       prompt: this.prompt,
       missions: this.board.missions.map((m) => ({ desc: m.desc, progress: m.progress, target: m.target, done: m.done, reward: m.reward })),
       dashReady: 1 - this.dashCd / this.dashCdMax,
+      roomName,
+      roomsExplored: this.exploredCount(),
+      roomsTotal: this.world.rooms.length,
+      map: this.world.map,
+      playerPt: { x: pp.x, z: pp.z, ang: this.facing },
+      enemyPts: this.enemies.filter((e) => e.alive).map((e) => ({ x: e.pos.x, z: e.pos.z, elite: e.elite })),
+      chestPts: this.world.rooms.filter((r) => r.chest && !r.chest.taken).map((r) => ({ x: r.chest!.pos.x, z: r.chest!.pos.z })),
     });
   }
 
@@ -384,6 +415,8 @@ export class Game {
     if (k === "1") this.selectBuild(this.buildMode === "barricade" ? null : "barricade");
     if (k === "2") this.selectBuild(this.buildMode === "turret" ? null : "turret");
     if (k === "3") this.selectBuild(this.buildMode === "medkit" ? null : "medkit");
+    if (k === "4") this.selectBuild(this.buildMode === "trap" ? null : "trap");
+    if (k === "5") this.selectBuild(this.buildMode === "totem" ? null : "totem");
     if (k === "q") this.selectBuild(null);
     if (k === "p" || k === "escape") this.togglePause();
   };
@@ -474,6 +507,27 @@ export class Game {
       this.spawnParticles(e.pos, "#ff8a5e", 5, 2.2);
       if (killed) this.onEnemyKilled(e);
     }
+    // objetos rompibles (jarrones, platos…)
+    for (const br of this.world.breakables) {
+      if (br.broken) continue;
+      const dx = br.pos.x - p.x;
+      const dz = br.pos.z - p.z;
+      const d = Math.hypot(dx, dz);
+      if (d > reach + 0.3) continue;
+      const dot = (dx * fx + dz * fz) / Math.max(0.001, d);
+      if (dot < 0.2) continue;
+      br.broken = true;
+      br.group.visible = false;
+      hitAny = true;
+      this.audio.shatter();
+      this.spawnParticles(br.pos, "#d8b06a", 9, 2.2);
+      const v = Math.round(br.value * this.coinMult);
+      this.coins += v;
+      this.coinsEarned += v;
+      this.score += 5;
+      this.spawnFloater(br.pos, `+${v}`, "#f4c542");
+      this.board.emit({ kind: "break" });
+    }
     if (hitAny) {
       this.audio.hitEnemy();
       this.shakeT = Math.max(this.shakeT, 0.14);
@@ -538,7 +592,7 @@ export class Game {
 
   private startWave(): void {
     const f = this.floorIndex;
-    const count = 3 + f + this.wave * 2;
+    const count = 5 + f * 2 + this.wave * 3;
     this.toSpawn = count;
     this.spawnTimer = 1.2;
     const isBossWave = this.bossWave && this.wave === this.waveTotal - 1;
@@ -571,7 +625,9 @@ export class Game {
       { id: "armor", title: "UNIFORME ACORAZADO", desc: "-20% de daño recibido", icon: "shield", apply: () => { this.armor *= 0.8; } },
       { id: "magnet", title: "IMÁN DE PROPINAS", desc: "Radio de recogida ×2 y +25% monedas", icon: "magnet", apply: () => { this.magnetMult *= 2; this.coinMult += 0.25; } },
       { id: "dash", title: "BOTAS DE BRUMA", desc: "Dash con 35% menos de espera", icon: "wind", apply: () => { this.dashCdMax *= 0.65; } },
-      { id: "med", title: "KIT DE CAMPO", desc: "Botiquines curan 50% más", icon: "cross", apply: () => { this.medBoost += 0.5; } },
+      { id: "med", title: "KIT DE CAMPO", desc: "Botiquines y veladores curan 50% más", icon: "cross", apply: () => { this.medBoost += 0.5; } },
+      { id: "trap", title: "PINCHOS MORTALES", desc: "Trampas +50% de daño", icon: "zap", apply: () => { this.trapBoost += 0.5; } },
+      { id: "vault", title: "OJO DE TESORERO", desc: "Cofres y rompibles +30% de monedas", icon: "magnet", apply: () => { this.coinMult += 0.3; } },
     ];
     const picked: Upgrade[] = [];
     while (picked.length < 3 && pool.length) {
@@ -584,6 +640,7 @@ export class Game {
   private pendingUpgrades: Upgrade[] = [];
   private turretBoost = 1;
   private medBoost = 1;
+  private trapBoost = 1;
 
   chooseUpgrade(id: string): void {
     const up = this.pendingUpgrades.find((u) => u.id === id);
@@ -610,6 +667,7 @@ export class Game {
     this.coinMult = 1;
     this.turretBoost = 1;
     this.medBoost = 1;
+    this.trapBoost = 1;
     this.dashCdMax = 1.5;
     this.coins = 0;
     this.keys = 0;
@@ -649,28 +707,39 @@ export class Game {
 
   /* --------------------------- enemigos --------------------------- */
 
-  private spawnEnemy(): void {
+  private spawnEnemy(): number {
     const alive = this.enemies.filter((e) => e.alive).length;
-    if (alive > 9 + this.floorIndex) return;
+    if (alive > 11 + this.floorIndex * 2) return 0;
 
     let type: EnemyType = "sombra";
     const f = this.floorIndex;
     const roll = Math.random();
-    if (roll < 0.32) type = "maleta";
-    else if (roll < 0.32 + 0.22 && f >= 1) type = "altisimo";
-    else if (roll < 0.32 + 0.22 + 0.16 && f >= 2) type = "fantasma";
+    if (roll < 0.2) type = "cucaracha";
+    else if (roll < 0.42) type = "maleta";
+    else if (roll < 0.56 && f >= 1) type = "altisimo";
+    else if (roll < 0.66 && f >= 2) type = "fantasma";
+    else if (roll < 0.76 && f >= 1) type = "camarista";
+    else if (roll < 0.85 && f >= 2) type = "nino";
+    else if (roll < 0.93 && f >= 2) type = "golem";
+
+    const elite = f >= 2 && Math.random() < Math.min(0.22, 0.07 + f * 0.025);
+    const pack = type === "cucaracha" ? 3 : 1;
 
     // emboscada: a veces sale de una habitación sin explorar
     const useAmbush = Math.random() < 0.3;
     const unexplored = this.world.rooms.filter((r) => !r.explored && !r.door.locked);
-    const spawn = useAmbush && unexplored.length > 0
+    const base = useAmbush && unexplored.length > 0
       ? unexplored[Math.floor(Math.random() * unexplored.length)].center.clone()
-      : this.world.elevatorPos.clone();
+      : this.world.spawnPoints[Math.floor(Math.random() * this.world.spawnPoints.length)].clone();
 
-    const enemy = new Enemy(type, this.floorIndex, spawn);
-    this.scene.add(enemy.group);
-    this.enemies.push(enemy);
-    this.spawnParticles(spawn, this.theme.accent, 10, 2.5);
+    for (let i = 0; i < pack; i++) {
+      const spawn = base.clone().add(new THREE.Vector3(rnd(-1.2, 1.2), 0, rnd(-1.2, 1.2)));
+      const enemy = new Enemy(type, this.floorIndex, spawn, elite);
+      this.scene.add(enemy.group);
+      this.enemies.push(enemy);
+      this.spawnParticles(spawn, this.theme.accent, 10, 2.5);
+    }
+    return pack;
   }
 
   private onEnemyKilled(e: Enemy): void {
@@ -678,14 +747,15 @@ export class Game {
     this.comboT = 4.5;
     this.combo = Math.min(8, this.combo + 1);
     const mult = 1 + (this.combo - 1) * 0.25;
-    const pts = Math.round(10 * mult);
+    const pts = Math.round((e.elite ? 30 : e.type === "gerente" ? 60 : e.type === "golem" ? 25 : 10) * mult);
     this.score += pts;
-    this.spawnFloater(e.pos, `+${pts}${this.combo >= 2 ? ` ×${this.combo}` : ""}`, "#a8e63c");
+    this.spawnFloater(e.pos, `+${pts}${this.combo >= 2 ? ` ×${this.combo}` : ""}`, e.elite ? "#f4c542" : "#a8e63c");
     this.spawnParticles(e.pos, this.theme.accent, 12, 3);
     this.audio.enemyDie();
-    this.board.emit({ kind: "kill", enemy: e.type });
+    this.board.emit({ kind: "kill", enemy: e.type, elite: e.elite });
+    if (e.type === "gerente") this.board.emit({ kind: "boss" });
     // suelta monedas
-    const n = e.type === "gerente" ? 8 : irnd(1, 3);
+    const n = e.type === "gerente" ? 10 : e.elite ? irnd(4, 6) : irnd(1, 3);
     for (let i = 0; i < n; i++) {
       const coin = new THREE.Mesh(
         new THREE.CylinderGeometry(0.14, 0.14, 0.05, 10),
@@ -700,6 +770,16 @@ export class Game {
     }
     if (e.type === "gerente") {
       this.cb.onToast("GERENTE DERROTADO ✓ botín épico", "ok");
+    } else if (e.elite) {
+      this.cb.onToast("ÉLITE DORADO derrotado ✓", "ok");
+    }
+    // rara vez suelta una llave
+    if (Math.random() < 0.05 && this.keys < 2) {
+      const g = new THREE.Group();
+      g.add(makeKeyMesh());
+      g.position.set(e.pos.x, 0.6, e.pos.z);
+      this.scene.add(g);
+      this.world.loot.push({ kind: "key", group: g, pos: g.position.clone(), taken: false, value: 1, phase: rnd(0, 6.28) });
     }
   }
 
@@ -722,7 +802,8 @@ export class Game {
     ghost.position.copy(this.ghostPos);
     const p = this.playerGroup.position;
     const near = Math.hypot(gx - p.x, gz - p.z) < 6.5;
-    const inside = Math.abs(gx) < 14.2 && Math.abs(gz) < 8.8 && gx > -13.6;
+    const b = this.world.bounds;
+    const inside = gx > b.minX + 0.9 && gx < b.maxX - 0.9 && gz > b.minZ + 0.9 && gz < b.maxZ - 0.9;
     const free = !this.overlapsAnything(gx, gz);
     this.ghostValid = near && inside && free;
     const mat = (ghost.children[0] as THREE.Mesh).material as THREE.MeshBasicMaterial;
@@ -820,6 +901,40 @@ export class Game {
             }
           }
         });
+      } else if (b.kind === "trap") {
+        b.cd = Math.max(0, (b.cd ?? 0) - dt);
+        if ((b.cd ?? 0) <= 0 && (b.uses ?? 0) > 0) {
+          for (const e of this.enemies) {
+            if (!e.alive || e.state === "emerge") continue;
+            if (Math.hypot(e.pos.x - b.pos.x, e.pos.z - b.pos.z) < 1.0) {
+              b.uses = (b.uses ?? 1) - 1;
+              b.cd = 0.5;
+              const killed = e.takeHit(Math.round((16 + this.floorIndex * 3) * this.trapBoost), b.pos);
+              this.audio.trapSnap();
+              this.spawnParticles(e.pos, "#ffa02f", 8, 2.2);
+              if (killed) this.onEnemyKilled(e);
+              break;
+            }
+          }
+        }
+        if ((b.uses ?? 0) <= 0) {
+          this.destroyBuild(b);
+          continue;
+        }
+      } else if (b.kind === "totem") {
+        const orb = b.head as unknown as THREE.Mesh | undefined;
+        if (orb) {
+          const mat = orb.material as THREE.MeshStandardMaterial;
+          mat.emissiveIntensity = 1.9 + Math.sin(performance.now() / 280 + b.pos.x) * 0.55;
+        }
+        const p = this.playerGroup.position;
+        if (Math.hypot(p.x - b.pos.x, p.z - b.pos.z) < 3.6 && this.hp < this.maxHp) {
+          b.recharge = (b.recharge ?? 0) + dt;
+          if ((b.recharge ?? 0) >= 1) {
+            b.recharge = 0;
+            this.hp = Math.min(this.maxHp, this.hp + Math.round(2 * this.medBoost));
+          }
+        }
       }
     }
   }
@@ -830,14 +945,23 @@ export class Game {
       pr.life -= dt;
       pr.mesh.position.addScaledVector(pr.vel, dt);
       let hit = false;
-      for (const e of this.enemies) {
-        if (!e.alive) continue;
-        if (Math.hypot(e.pos.x - pr.mesh.position.x, e.pos.z - pr.mesh.position.z) < e.stats.radius + 0.15) {
-          const killed = e.takeHit(pr.dmg, pr.mesh.position);
-          this.spawnParticles(e.pos, "#8dff5e", 4, 2);
-          if (killed) this.onEnemyKilled(e);
+      if (pr.hostile) {
+        const p = this.playerGroup.position;
+        if (Math.hypot(p.x - pr.mesh.position.x, p.z - pr.mesh.position.z) < 0.55) {
+          this.damagePlayer(pr.dmg, pr.mesh.position);
+          this.spawnParticles(pr.mesh.position, "#7dffa8", 6, 2);
           hit = true;
-          break;
+        }
+      } else {
+        for (const e of this.enemies) {
+          if (!e.alive) continue;
+          if (Math.hypot(e.pos.x - pr.mesh.position.x, e.pos.z - pr.mesh.position.z) < e.stats.radius + 0.15) {
+            const killed = e.takeHit(pr.dmg, pr.mesh.position);
+            this.spawnParticles(e.pos, "#8dff5e", 4, 2);
+            if (killed) this.onEnemyKilled(e);
+            hit = true;
+            break;
+          }
         }
       }
       if (hit || pr.life <= 0) {
@@ -911,13 +1035,13 @@ export class Game {
       const d = r.door;
       if (d.broken) continue;
       const dist = Math.hypot(p.x - d.panel.position.x, p.z - d.panel.position.z);
-      if (dist < 1.5 && d.open01 < 0.5) {
+      if (dist < 1.7 && d.open01 < 0.5) {
         if (d.locked) {
           if (this.keys > 0) {
-            this.prompt = "USAR LLAVE-TARJETA";
+            this.prompt = d.locks > 1 ? `USAR LLAVE · FALTAN ${d.locks} (tienes ${this.keys})` : "USAR LLAVE-TARJETA";
             this.promptAction = () => this.unlockDoor(r.door);
           } else {
-            this.prompt = "CERRADA — busca la llave-tarjeta";
+            this.prompt = d.locks > 1 ? "BÓVEDA — NECESITA 2 LLAVES" : "CERRADA — busca la llave-tarjeta";
           }
         } else {
           this.prompt = "ABRIR PUERTA";
@@ -956,16 +1080,22 @@ export class Game {
     }
   }
 
-  private unlockDoor(d: { locked: boolean; signMat: THREE.MeshBasicMaterial; target: number; panel: THREE.Mesh; baseColor: string }): void {
+  private unlockDoor(d: DoorInfo): void {
+    if (this.keys <= 0 || !d.locked) return;
     this.keys--;
-    d.locked = false;
-    d.target = 1;
-    (d.panel.material as THREE.MeshStandardMaterial).color.set("#3a2517");
-    d.signMat.map = null;
-    d.signMat.needsUpdate = true;
+    d.locks = Math.max(0, d.locks - 1);
     this.audio.key();
-    this.audio.door();
-    this.cb.onToast("Puerta desbloqueada ✓", "ok");
+    if (d.locks === 0) {
+      d.locked = false;
+      d.target = 1;
+      (d.panel.material as THREE.MeshStandardMaterial).color.set("#3a2517");
+      d.signMat.map = null;
+      d.signMat.needsUpdate = true;
+      this.audio.door();
+      this.cb.onToast("Puerta desbloqueada ✓", "ok");
+    } else {
+      this.cb.onToast(`Falta 1 llave más para la BÓVEDA (te quedan ${this.keys})`, "info");
+    }
   }
 
   private openChest(c: LootItem): void {
@@ -978,8 +1108,14 @@ export class Game {
     this.audio.coin();
     this.audio.upgrade();
     this.spawnFloater(c.pos, `+${value} MONEDAS`, "#f4c542");
-    this.spawnParticles(c.pos, "#f4c542", 16, 3);
+    this.spawnParticles(c.pos, "#f4c542", 20, 3.4);
     this.board.emit({ kind: "coin", amount: value });
+    const room = this.world.rooms.find((r) => r.chest === c);
+    if (room?.special === "BÓVEDA") {
+      this.board.emit({ kind: "vault" });
+      this.score += 250;
+      this.cb.onToast("BÓVEDA SAQUEADA ✓ +250 puntos · ¡jackpot!", "ok");
+    }
     c.group.visible = false;
     this.pushHud();
   }
@@ -1109,7 +1245,7 @@ export class Game {
       if (d < 0.55) {
         l.taken = true;
         this.scene.remove(l.group);
-        if (l.kind === "coin") {
+        if (l.kind === "coin" || l.kind === "gold") {
           const v = Math.round(l.value * this.coinMult);
           this.coins += v;
           this.coinsEarned += v;
@@ -1141,24 +1277,17 @@ export class Game {
       }
     }
 
-    // puertas animación
-    for (const r of this.world.rooms) {
-      const d = r.door;
-      d.open01 = damp(d.open01, d.target, 8, dt);
-      const north = d.panel.position.z < 0;
-      d.panel.position.x = d.panel.position.x; // posición base
-      const base = d.collider.minX + (d.collider.maxX - d.collider.minX) / 2;
-      d.panel.position.x = base - d.open01 * (DOOR_DIR_SIGN(north) * 1.7);
-      d.panel.visible = !d.broken || d.open01 < 0.9;
-    }
+    // puertas y puertas animadas las gestiona world.update
+    this.world.update(dt);
 
     // exploración de habitaciones
     for (const r of this.world.rooms) {
       if (!r.explored && pointInZoneRoom(r, p.x, p.z)) {
         r.explored = true;
-        this.score += 50;
+        const bonus = r.special ? 150 : 75;
+        this.score += bonus;
         this.audio.chimeArrival();
-        this.cb.onToast(`Habitación ${r.idx + 1} explorada · +50 puntos`, "info");
+        this.cb.onToast(`${r.special ?? r.name} explorada · +${bonus} puntos`, "info");
         this.board.emit({ kind: "room" });
       }
     }
@@ -1177,16 +1306,20 @@ export class Game {
     if (this.toSpawn > 0) {
       this.spawnTimer -= dt;
       if (this.spawnTimer <= 0) {
-        this.spawnEnemy();
-        this.toSpawn--;
-        this.spawnTimer = rnd(1.4, 2.6) / (1 + this.floorIndex * 0.05);
+        this.toSpawn -= this.spawnEnemy();
+        this.spawnTimer = rnd(1.2, 2.2) / (1 + this.floorIndex * 0.05);
       }
-      // jefe
+      // jefe con esbirros
       if (this.bossWave && this.wave === this.waveTotal - 1 && !this.bossSpawned && this.toSpawn <= 2) {
         this.bossSpawned = true;
         const boss = new Enemy("gerente", this.floorIndex, this.world.elevatorPos.clone());
         this.scene.add(boss.group);
         this.enemies.push(boss);
+        for (let i = 0; i < 2; i++) {
+          const add = new Enemy("camarista", this.floorIndex, this.world.elevatorPos.clone().add(new THREE.Vector3(i ? 1.6 : -1.6, 0, 1.3)));
+          this.scene.add(add.group);
+          this.enemies.push(add);
+        }
         this.audio.roar();
         this.spawnParticles(boss.pos, "#ff5a4e", 20, 3.5);
       }
@@ -1290,9 +1423,10 @@ export class Game {
     const finalDist = Math.max(1.0, Math.min(dist, tHit - 0.35));
 
     const target = new THREE.Vector3(p.x + dirX * finalDist, p.y + height, p.z + dirZ * finalDist);
-    target.x = clamp(target.x, -14.55, 14.55);
-    target.z = clamp(target.z, -9.05, 9.05);
-    target.y = clamp(target.y, 1.2, 4.35);
+    const wb = this.world.bounds;
+    target.x = clamp(target.x, wb.minX + 0.8, wb.maxX - 0.8);
+    target.z = clamp(target.z, wb.minZ + 0.8, wb.maxZ - 0.8);
+    target.y = clamp(target.y, 1.2, 4.5);
     const k = this.phase === "intro" ? 2.2 : 7;
     this.camPos.x = damp(this.camPos.x, target.x, k, dt);
     this.camPos.y = damp(this.camPos.y, target.y, k, dt);
@@ -1347,12 +1481,12 @@ export class Game {
 
     // iluminación día/noche
     this.lightK = damp(this.lightK, this.targetLightK, 1.2, dt);
-    this.hemi.intensity = 0.6 + this.lightK * 0.95;
-    this.moon.intensity = 0.9 + this.lightK * 1.1;
+    this.hemi.intensity = 0.92 + this.lightK * 0.7;
+    this.moon.intensity = 1.3 + this.lightK * 0.75;
     this.moon.color.setHSL(0.6, 0.5, 0.55 + this.lightK * 0.1);
     if (this.scene.fog instanceof THREE.Fog) {
-      this.scene.fog.near = 16 + this.lightK * 8;
-      this.scene.fog.far = 30 + this.lightK * 20;
+      this.scene.fog.near = 20 + this.lightK * 6;
+      this.scene.fog.far = 34 + this.lightK * 28;
     }
 
     if (this.fadeK > 0) this.fadeK = Math.max(0, this.fadeK - dt * 1.4);
@@ -1407,6 +1541,13 @@ export class Game {
       obstacles: this.obstacles,
       damagePlayer: (dmg, from) => this.damagePlayer(dmg, from),
       damageObstacle: (o, dmg) => this.damageObstacle(o, dmg),
+      spawnEnemyProjectile: (from, dir, dmg) => {
+        const pr = makeProjectile(from, dir, dmg, true);
+        this.scene.add(pr.mesh);
+        this.projectiles.push(pr);
+        this.audio.throwSfx();
+      },
+      fx: (pos, color, n, speed) => this.spawnParticles(pos, color, n, speed),
     };
     // reconstruir obstáculos: puertas cerradas + barricadas
     this.obstacles = [];
@@ -1425,6 +1566,19 @@ export class Game {
     for (const b of this.builds) {
       if (b.alive && b.aabb) {
         this.obstacles.push({ pos: b.pos, aabb: b.aabb, kind: "barricade", hp: b.hp, alive: true });
+      }
+    }
+
+    // aura del velador santo: ralentiza enemigos
+    const totems = this.builds.filter((b) => b.kind === "totem" && b.alive);
+    for (const e of this.enemies) {
+      if (!e.alive) { e.slowK = 1; continue; }
+      e.slowK = 1;
+      for (const t of totems) {
+        if (Math.hypot(e.pos.x - t.pos.x, e.pos.z - t.pos.z) < 4.4) {
+          e.slowK = 0.55;
+          break;
+        }
       }
     }
 
@@ -1509,13 +1663,7 @@ export class Game {
 }
 
 /* helpers locales */
-function DOOR_DIR_SIGN(north: boolean): number {
-  return north ? -1 : 1;
-}
 
 function pointInZoneRoom(r: { zone: { minX: number; maxX: number; minZ: number; maxZ: number } }, x: number, z: number): boolean {
   return x >= r.zone.minX && x <= r.zone.maxX && z >= r.zone.minZ && z <= r.zone.maxZ;
 }
-
-/* makeKeyMesh re-exportado para uso futuro (p. ej. llaves visibles en HUD 3D) */
-void makeKeyMesh;
