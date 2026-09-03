@@ -12,7 +12,7 @@ import {
 import GddView from "./components/Gdd";
 import RoadmapView from "./components/Roadmap";
 import CodebaseView from "./components/Codebase";
-import DemoView from "./components/Demo";
+import DemoView from "./components/Game3D";
 import { useCountUp, useInView } from "./hooks";
 import {
   GameIcon,
@@ -159,8 +159,8 @@ function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void })
       ["SRC", "Instalación", "#codigo"],
     ],
     demo: [
-      ["DEMO", "Turno de noche", "#demo-top"],
-      ["DEMO", "Cómo jugar", "#demo-como"],
+      ["JUGAR", "El turno", "#jugar-top"],
+      ["JUGAR", "Reglas", "#reglas"],
     ],
   };
   const links = linksByView[view];
@@ -217,7 +217,7 @@ function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void })
                 view === "demo" ? "bg-amber text-deep" : "text-fog hover:text-paper"
               }`}
             >
-              ▶ DEMO
+              ▶ JUGAR
             </button>
             <button
               onClick={() => onSelect("code")}
@@ -279,7 +279,7 @@ function Opening({ onPlayDemo }: { onPlayDemo: () => void }) {
                 onClick={onPlayDemo}
                 className="font-display group inline-flex cursor-pointer items-center gap-3 border-2 border-amber bg-amber px-7 py-3.5 text-sm text-deep transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_32px_rgba(255,160,47,0.35)] active:translate-y-0"
               >
-                ▶ JUGAR LA DEMO
+                ▶ JUGAR LA DEMO 3D
                 <IconArrow className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
               </button>
               <a
@@ -504,7 +504,7 @@ function ConceptDetail({ game, onPlayDemo }: { game: GameConcept; onPlayDemo: ()
             onClick={onPlayDemo}
             className="font-display mt-5 inline-flex cursor-pointer items-center gap-3 border-2 border-amber bg-amber px-6 py-3 text-xs text-deep transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_32px_rgba(255,160,47,0.35)] active:translate-y-0"
           >
-            ▶ JUGAR LA DEMO DEL TURNO DE NOCHE
+            ▶ JUGAR LA DEMO 3D DEL TURNO DE NOCHE
           </button>
         )}
       </div>
@@ -874,7 +874,7 @@ function Footer() {
           <span className="font-display text-xs text-paper">
             GAME<span className="text-amber">LAB</span>
           </span>
-          <span className="ml-3 text-xs text-fog">Roblox Game Lab · v1.1 · 2026</span>
+          <span className="ml-3 text-xs text-fog">Roblox Game Lab · v2.0 · 2026</span>
         </div>
         <p className="max-w-md text-xs leading-relaxed text-fog">
           Documento conceptual no oficial, sin afiliación con Roblox Corporation.

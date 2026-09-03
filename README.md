@@ -19,24 +19,28 @@
 
 ---
 
-## 🎮 DEMO JUGABLE — Turno de noche en el Hotel ∞
+## 🎮 DEMO JUGABLE 3D — Turno de noche en el Hotel ∞
 
-El loop central del juego ya se puede jugar **en el propio sitio**: pulsa **▶ DEMO** en la navegación (o «Jugar la demo» en el hero) y firma tu contrato de mantenimiento nocturno.
+El loop central del juego ya se puede jugar **en 3D dentro del propio sitio**: pulsa **▶ JUGAR** en la navegación (o «Jugar la demo 3D» en el hero) y coge el turno de noche como botones del hotel.
 
 | | |
 |---|---|
-| ![Demo del Hotel ∞ Infinito](docs/screenshots/demo-jugando.jpg) | ![Demo en móvil](docs/screenshots/demo-movil.jpg) |
-| *Piso P-13 — La Piscina Sin Fin* | *Controles táctiles en móvil* |
+| ![Demo 3D del Hotel ∞ Infinito](docs/screenshots/game-3d.jpg) | ![Demo en móvil](docs/screenshots/game-mobile.jpg) |
+| *Recepción del P-13 — avatar estilo Roblox, cámara en 3ª persona* | *Joystick táctil y botones en móvil* |
+| ![Ficha de registro](docs/screenshots/game-card.jpg) | | 
+| *Ficha de registro: ¿huésped normal o anomalía?* | |
 
-**Tres pisos, tres reglas, ninguna explicación:**
+**Cómo se juega:**
 
-- 🌊 **P-13 · La Piscina Sin Fin** — completa tareas sin pisar el agua… que se reorganiza tras cada tarea.
-- 🪞 **P-∞ · El Piso Espejo** — controles invertidos y tus reflejos te persiguen para ocupar tu turno.
-- 🔥 **P--1 · La Caldera** — aguanta 75 s alimentando tres calderas que pierden presión sin motivo.
+- 🕐 **Sobrevive de 12:00 AM a 6:00 AM** atendiendo la recepción de cada piso.
+- 🚶 **Acércate a los huéspedes** que llegan de la entrada y pulsa `E` para revisar su ficha.
+- ✅ **Da la entrada** a los huéspedes normales: dejan propina en R$.
+- 🚨 **Denuncia anomalías**: ojos rojos, cuerpo gris, piernas imposibles, flotación, cara vacía, sin sombra — o fichas falsificadas (color distinto, habitación `P-∞`, llegada a las 04:44).
+- ❤️ **Tres errores y estás despedido.** Cada noche superada baja el ascensor a un peor: P-13, P-∞, P--1 y pisos que no aparecen en ningún plano.
 
-**Mecánicas:** cruceta táctil + WASD/flechas, mantener TRABAJAR frente a una puerta, propinas por tarea, apagones, eventos aleatorios, sistema de corazones (si fallas, te «despiden» con mensaje cómico) y final con rango según propinas (Becario del Vacío → Gerente Eterno ∞).
+**Bajo el capó:** motor propio sobre [Three.js](https://threejs.org/) (~2.000 líneas de TypeScript en `src/game/`), avatares R6 estilo Roblox con animación procedural, hotel con iluminación dinámica y sombras, cámara en 3ª persona con raycast anti-muros, audio sintetizado con WebAudio (sin assets), temas de piso procedurales infinitos y controles táctiles (joystick + botones) además de WASD/espacio/E.
 
-> La demo demuestra el loop de 90 segundos descrito en el GDD. El juego completo vive en Roblox Studio — el código Luau de referencia está en la vista CÓDIGO.
+> La demo demuestra el loop descrito en el GDD. El juego completo vive en Roblox Studio — el código Luau de referencia está en la vista CÓDIGO.
 
 ## 📖 Sobre el proyecto
 
@@ -62,7 +66,7 @@ El concepto ganador — **Hotel ∞ Infinito**, terror cómico cooperativo con p
 | 🔬 **LAB** | Radiografía del mercado con métricas animadas, 5 insights de diseño, 3 conceptos con loop y escenarios, tabla comparativa y veredicto razonado |
 | 🏨 **HOTEL ∞** | GDD completo: pilares, roles, economia de propinas, escenarios firma (Piscina Sin Fin, Piso Espejo, La Caldera), sistemas y UI |
 | 🗺️ **PLAN** | Roadmap de 12 semanas en 4 fases: prototipo vertical → generador procedural → beta cerrada → lanzamiento y live-ops |
-| 🎮 **DEMO** | Demo jugable del turno de noche: 3 pisos con reglas propias, propinas, apagones y despidos cómicos |
+| 🎮 **JUGAR** | Demo 3D jugable del turno de noche: recepción en 3ª persona, huéspedes con anomalías, fichas de registro y pisos infinitos |
 | 💻 **CÓDIGO** | Referencia técnica en Luau: arquitectura cliente/servidor, sistema de gráficos y patrón de generación procedural |
 
 ## 🧩 Los tres conceptos
@@ -80,9 +84,11 @@ El concepto ganador — **Hotel ∞ Infinito**, terror cómico cooperativo con p
 | Tecnología | Uso |
 |---|---|
 | [React 18](https://react.dev/) + [TypeScript 5](https://www.typescriptlang.org/) | UI declarativa con tipado estricto |
+| [Three.js](https://threejs.org/) | Motor 3D de la demo jugable (avatares, hotel, luces y sombras) |
 | [Vite 6](https://vite.dev/) | Dev server y build de producción |
 | [Tailwind CSS 4](https://tailwindcss.com/) | Sistema de diseño con tokens (`@theme`) |
 | Lucide React | Iconografía |
+| WebAudio API | Audio de la demo 100% sintetizado, sin assets |
 | IntersectionObserver API | Animaciones scroll-reveal y contadores (sin dependencias externas) |
 | CSS keyframes propios | Marquee, flotación, scan-sweep, reveals — respetando `prefers-reduced-motion` |
 
