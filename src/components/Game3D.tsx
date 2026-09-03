@@ -1,578 +1,501 @@
 /* ============================================================
-   HOTEL ∞ INFINITO — Demo 3D · interfaz del juego
-   HUD + ficha de registro + menús + controles táctiles.
+   HOTEL ∞ INFINITO — NOCHE INFINITA · interfaz del juego
+   HUD · misiones · construcción · oleadas · mejoras · táctil.
    ============================================================ */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  ArrowRight, BadgeCheck, Ban, BookOpen, Clock, Coins, Gauge,
-  Gamepad2, Heart, Moon, MousePointer2, Pause, Play, RotateCcw,
-  ShieldAlert, Sparkles, Users, Volume2, VolumeX,
+  Coins, Cross, Crosshair, Expand, Gamepad2, Heart, KeyRound, Magnet,
+  MousePointer2, Pause, Play, RotateCcw, Shield, ShieldAlert, Sword,
+  Target, Volume2, VolumeX, Wind, Zap, Swords, Trophy,
+  type LucideIcon,
 } from "lucide-react";
-import type { Game, GameStats, HudState } from "../game/Game";
-import type { GuestCardData } from "../game/guest";
-
-type Toast = { id: number; msg: string; kind: "ok" | "bad" | "info" };
+import { Game, type GameStats, type HudState, type UpgradeCard } from "../game/Game";
+import type { BuildKind } from "../game/builds";
 
 const HEX = {
-  amber: "#ffa02f",
   lime: "#a8e63c",
   cyan: "#38e1d4",
+  amber: "#ffa02f",
   red: "#ff5a4e",
+  gold: "#f4c542",
 };
 
-function Hearts({ n }: { n: number }) {
-  return (
-    <div className="flex gap-1">
-      {[0, 1, 2].map((i) => (
-        <Heart
-          key={i}
-          size={18}
-          strokeWidth={2.5}
-          className="transition-all duration-300"
-          style={{
-            color: i < n ? HEX.red : "#31405c",
-            fill: i < n ? HEX.red : "transparent",
-            transform: i < n ? "scale(1)" : "scale(0.82)",
-          }}
-        />
-      ))}
-    </div>
-  );
-}
+type Toast = { id: number; msg: string; kind: "ok" | "bad" | "info" };
+type Banner = { id: number; title: string; sub: string };
 
-function GameButton({
-  children, onClick, kind = "primary",
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  kind?: "primary" | "danger" | "ghost";
-}) {
-  const bg = kind === "primary" ? HEX.lime : kind === "danger" ? HEX.red : "var(--color-panel)";
-  const fg = kind === "ghost" ? "var(--color-paper)" : "#08101f";
-  return (
-    <button
-      onClick={onClick}
-      className="font-display inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-black/30 px-6 py-3.5 text-sm tracking-wide shadow-[0_6px_0_rgba(0,0,0,0.45)] transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none md:text-base"
-      style={{ background: bg, color: fg }}
-    >
-      {children}
-    </button>
-  );
-}
+const UPGRADE_ICONS: Record<string, LucideIcon> = {
+  sword: Sword, heart: Heart, zap: Zap, target: Target, expand: Expand,
+  shield: Shield, magnet: Magnet, wind: Wind, cross: Cross,
+};
 
-export default function Game3D({ onOpenGdd }: { onOpenLab: () => void; onOpenGdd: () => void }) {
+const BUILD_SLOTS: { kind: BuildKind; icon: LucideIcon; label: string; cost: number }[] = [
+  { kind: "barricade", icon: Shield, label: "BARRICADA", cost: 25 },
+  { kind: "turret", icon: Crosshair, label: "TORRETA", cost: 60 },
+  { kind: "medkit", icon: Cross, label: "BOTIQUÍN", cost: 40 },
+];
+
+export default function Game3D() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game | null>(null);
-  const joyRef = useRef<HTMLDivElement>(null);
-  const toastId = useRef(0);
+  const idRef = useRef(0);
 
   const [hud, setHud] = useState<HudState | null>(null);
-  const [card, setCard] = useState<GuestCardData | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [hurt, setHurt] = useState(false);
+  const [banner, setBanner] = useState<Banner | null>(null);
+  const [upgrades, setUpgrades] = useState<UpgradeCard[] | null>(null);
+  const [gameOver, setGameOver] = useState<GameStats | null>(null);
   const [muted, setMuted] = useState(false);
-  const [cleared, setCleared] = useState<GameStats | null>(null);
-  const [over, setOver] = useState<GameStats | null>(null);
-  const [isTouch, setIsTouch] = useState(false);
-  const [knob, setKnob] = useState({ x: 0, y: 0 });
-  const [booted, setBooted] = useState(false);
+  const [hurtFx, setHurtFx] = useState(0);
+  const [started, setStarted] = useState(false);
+  const isTouch = useRef(false);
 
-  /* ------------------------- init del motor ------------------------- */
   useEffect(() => {
-    const coarse = window.matchMedia("(pointer: coarse)").matches;
-    const hasTouch = navigator.maxTouchPoints > 0 || "ontouchstart" in window;
-    const mobileUA = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent);
-    setIsTouch(coarse || (hasTouch && window.innerWidth < 820) || (mobileUA && window.innerWidth < 820));
-    const canvas = canvasRef.current;
-    if (!canvas || gameRef.current) return;
-    let mounted = true;
-
-    import("../game/Game").then(({ Game }) => {
-      if (!mounted || !canvasRef.current) return;
-      const g = new Game(canvasRef.current, {
-        onHud: (s) => setHud(s),
-        onCard: (c) => setCard(c),
-        onToast: (msg, kind) => {
-          const id = ++toastId.current;
-          setToasts((t) => [...t.slice(-3), { id, msg, kind }]);
-          window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2800);
-        },
-        onHurt: () => {
-          setHurt(true);
-          window.setTimeout(() => setHurt(false), 550);
-        },
-        onCleared: (stats) => setCleared(stats),
-        onGameOver: (stats) => setOver(stats),
-      });
-      gameRef.current = g;
-      (window as unknown as { __hotelGame?: Game }).__hotelGame = g;
-      setBooted(true);
+    isTouch.current = window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
+    if (!canvasRef.current) return;
+    const game = new Game(canvasRef.current, {
+      onHud: (s) => setHud({ ...s }),
+      onToast: (msg, kind) => {
+        const id = ++idRef.current;
+        setToasts((t) => [...t.slice(-3), { id, msg, kind }]);
+        window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3000);
+      },
+      onBanner: (title, sub) => setBanner({ id: ++idRef.current, title, sub }),
+      onHurt: () => setHurtFx((n) => n + 1),
+      onUpgrades: (cards) => setUpgrades(cards),
+      onGameOver: (stats) => setGameOver(stats),
     });
-
-    return () => {
-      mounted = false;
-      gameRef.current?.dispose();
-      gameRef.current = null;
-    };
+    gameRef.current = game;
+    return () => game.dispose();
   }, []);
 
-  /* --------------------------- teclas ficha --------------------------- */
   useEffect(() => {
-    if (!card) return;
-    const onKey = (e: KeyboardEvent) => {
-      const k = e.key.toLowerCase();
-      if (k === "e" || k === "enter" || k === "1") {
-        e.preventDefault();
-        gameRef.current?.decide(true);
-      } else if (k === "q" || k === "backspace" || k === "2") {
-        e.preventDefault();
-        gameRef.current?.decide(false);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [card]);
+    if (!banner) return;
+    const t = window.setTimeout(() => setBanner(null), 3200);
+    return () => window.clearTimeout(t);
+  }, [banner]);
 
-  /* ----------------------------- joystick ----------------------------- */
-  const joyActive = useRef(false);
-  const updateJoy = (clientX: number, clientY: number) => {
-    const el = joyRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
-    let dx = clientX - cx;
-    let dy = clientY - cy;
-    const max = r.width / 2;
-    const len = Math.hypot(dx, dy);
-    if (len > max) {
-      dx = (dx / len) * max;
-      dy = (dy / len) * max;
-    }
-    setKnob({ x: dx, y: dy });
-    gameRef.current?.setJoystick(dx / max, dy / max);
+  const play = () => {
+    gameRef.current?.begin();
+    setStarted(true);
   };
-  const endJoy = () => {
-    joyActive.current = false;
-    setKnob({ x: 0, y: 0 });
+
+  const restart = () => {
+    setGameOver(null);
+    gameRef.current?.restart();
+  };
+
+  const phase = hud?.phase ?? "intro";
+  const showIntro = !started;
+  const buildMode = hud?.buildMode ?? null;
+  const hpPct = hud ? (hud.hp / hud.maxHp) * 100 : 100;
+
+  /* ------------------------------ joystick ------------------------------ */
+  const joyRef = useRef<{ id: number; ox: number; oy: number } | null>(null);
+  const [joyKnob, setJoyKnob] = useState({ x: 0, y: 0, active: false });
+
+  const joyDown = (e: React.PointerEvent) => {
+    if (joyRef.current) return;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    joyRef.current = { id: e.pointerId, ox: e.clientX, oy: e.clientY };
+    setJoyKnob({ x: 0, y: 0, active: true });
+  };
+  const joyMove = (e: React.PointerEvent) => {
+    const j = joyRef.current;
+    if (!j || j.id !== e.pointerId) return;
+    const dx = e.clientX - j.ox;
+    const dy = e.clientY - j.oy;
+    const max = 46;
+    const len = Math.hypot(dx, dy);
+    const cl = len > max ? max / len : 1;
+    const nx = dx * cl, ny = dy * cl;
+    setJoyKnob({ x: nx, y: ny, active: true });
+    gameRef.current?.setJoystick(nx / max, ny / max);
+  };
+  const joyUp = (e: React.PointerEvent) => {
+    const j = joyRef.current;
+    if (!j || j.id !== e.pointerId) return;
+    joyRef.current = null;
+    setJoyKnob({ x: 0, y: 0, active: false });
     gameRef.current?.setJoystick(0, 0);
   };
 
-  const toggleMute = useCallback(() => {
-    setMuted((m) => {
-      gameRef.current?.audio.setMuted(!m);
-      return !m;
-    });
-  }, []);
-
-  const phase = hud?.phase ?? "intro";
-  const showIntroCard = phase === "intro";
-  const promptVisible = phase === "play" && hud?.prompt;
-
   return (
-    <div id="jugar-top" className="mx-auto w-full max-w-6xl px-4 pb-16 pt-8 md:pt-12">
-      {/* ------------------------- cabecera ------------------------- */}
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="mb-1 font-display text-xs tracking-[0.3em]" style={{ color: HEX.amber }}>
-            DEMO JUGABLE 3D
-          </p>
-          <h2 className="font-display text-3xl leading-none text-paper md:text-5xl">
-            TURNO DE NOCHE ∞
-          </h2>
-        </div>
-        <p className="max-w-sm text-sm text-fog">
-          Prototipo jugable del loop del GDD: atiende la recepción, detecta anomalías
-          y sobrevive hasta las 6:00 AM. Construido con Three.js.
-        </p>
-      </div>
+    <div className="relative h-[100dvh] w-full overflow-hidden bg-[#070d18] select-none">
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
-      {/* --------------------------- lienzo --------------------------- */}
+      {/* flash de daño */}
       <div
-        className="relative overflow-hidden rounded-2xl border border-line bg-deep shadow-2xl"
-        style={{ height: "min(76vh, 720px)", minHeight: 420 }}
-      >
-        <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none select-none" />
+        key={hurtFx}
+        className="pointer-events-none absolute inset-0 animate-hurt z-30"
+        style={{ boxShadow: "inset 0 0 120px 30px rgba(255,60,40,0.55)" }}
+      />
 
-        {/* flash de daño */}
-        {hurt && (
-          <div
-            className="pointer-events-none absolute inset-0 z-30 animate-pulse"
-            style={{ background: "radial-gradient(ellipse at center, transparent 40%, rgba(255,36,24,0.55) 100%)" }}
-          />
-        )}
-
-        {/* --------------------------- HUD --------------------------- */}
-        {hud && (phase === "play" || phase === "card" || phase === "paused") && (
-          <>
-            {/* fila superior */}
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between p-3 md:p-4">
-              <div className="rounded-lg border border-line bg-deep/80 px-3 py-2 backdrop-blur-sm">
-                <p className="font-display text-[11px] leading-tight" style={{ color: hud.floorCode === "P-∞" ? HEX.amber : HEX.cyan }}>
-                  {hud.floorCode}
-                </p>
-                <p className="text-[11px] text-fog">{hud.floorName}</p>
-              </div>
-
-              <div className="flex flex-col items-center gap-1">
-                <div className="flex items-center gap-2 rounded-lg border border-line bg-deep/80 px-3 py-1.5 backdrop-blur-sm">
-                  <Moon size={14} style={{ color: HEX.cyan }} />
-                  <span className="font-display text-sm text-paper">{hud.timeLabel}</span>
-                </div>
-                <div className="h-1.5 w-36 overflow-hidden rounded-full bg-panel">
+      {/* ============================== HUD ============================== */}
+      {hud && !showIntro && phase !== "over" && (
+        <>
+          {/* barra superior */}
+          <div className="absolute top-0 inset-x-0 z-20 flex items-start justify-between gap-2 p-2 pt-12 sm:p-3 sm:pt-13">
+            {/* vida */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-2 rounded-xl border border-[#223350] bg-[#0f1b31]/90 px-3 py-2 backdrop-blur">
+                <Heart size={16} style={{ color: HEX.red, fill: HEX.red }} />
+                <div className="h-3.5 w-24 sm:w-32 overflow-hidden rounded-full bg-[#1a2740]">
                   <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${hud.nightProgress * 100}%`, background: `linear-gradient(90deg, ${HEX.cyan}, ${HEX.amber})` }}
+                    className="h-full rounded-full transition-all duration-200"
+                    style={{
+                      width: `${hpPct}%`,
+                      background: hpPct > 50 ? "linear-gradient(90deg,#7dffa8,#a8e63c)" : hpPct > 25 ? "linear-gradient(90deg,#ffa02f,#ffc46b)" : "linear-gradient(90deg,#ff5a4e,#ff8a5e)",
+                    }}
                   />
                 </div>
-                {hud.combo >= 2 && (
-                  <span className="font-display rounded-full px-2 py-0.5 text-[10px]" style={{ background: HEX.lime, color: "#08101f" }}>
-                    RACHA ×{hud.combo}
+                <span className="font-display text-[11px] text-[#e9f1fc]">{hud.hp}/{hud.maxHp}</span>
+              </div>
+              {/* dash */}
+              <div className="flex items-center gap-1.5 rounded-lg border border-[#223350] bg-[#0f1b31]/80 px-2.5 py-1">
+                <Wind size={12} style={{ color: hud.dashReady >= 1 ? HEX.cyan : "#4a5c7d" }} />
+                <div className="h-1.5 w-16 overflow-hidden rounded-full bg-[#1a2740]">
+                  <div className="h-full rounded-full" style={{ width: `${Math.min(100, hud.dashReady * 100)}%`, background: HEX.cyan }} />
+                </div>
+              </div>
+              {/* misiones */}
+              <div className="hidden sm:flex flex-col gap-1">
+                {hud.missions.map((m, i) => (
+                  <div key={i} className={`rounded-lg border px-2.5 py-1.5 backdrop-blur ${m.done ? "border-[#a8e63c]/50 bg-[#0f1b31]/85" : "border-[#223350] bg-[#0f1b31]/80"}`}>
+                    <div className="flex items-center gap-1.5">
+                      {m.done ? <ShieldAlert size={12} style={{ color: HEX.lime }} /> : <Target size={12} style={{ color: HEX.amber }} />}
+                      <span className={`text-[10.5px] leading-tight ${m.done ? "text-[#a8e63c] line-through" : "text-[#c9d6ec]"}`}>{m.desc}</span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <div className="h-1 w-20 overflow-hidden rounded-full bg-[#1a2740]">
+                        <div className="h-full rounded-full" style={{ width: `${(m.progress / m.target) * 100}%`, background: m.done ? HEX.lime : HEX.amber }} />
+                      </div>
+                      <span className="text-[9px] text-[#8fa4c2]">+{m.reward}🪙</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* fase central */}
+            <div className="flex flex-col items-center gap-1">
+              <div className="rounded-xl border border-[#223350] bg-[#0f1b31]/90 px-3 py-1.5 text-center backdrop-blur">
+                <div className="font-display text-[11px] tracking-wide" style={{ color: phase === "night" ? HEX.red : phase === "cleared" ? HEX.lime : HEX.cyan }}>
+                  {hud.phaseLabel || "HOTEL ∞"}
+                </div>
+                <div className="mt-1 h-1.5 w-28 sm:w-40 overflow-hidden rounded-full bg-[#1a2740]">
+                  <div className="h-full rounded-full transition-all" style={{ width: `${hud.phaseProgress * 100}%`, background: phase === "night" ? HEX.red : HEX.amber }} />
+                </div>
+              </div>
+              <div className="rounded-lg border border-[#223350] bg-[#0f1b31]/85 px-2.5 py-1 font-display text-[10px] text-[#8fa4c2]">
+                {hud.floorCode} · {hud.floorName}
+              </div>
+              {phase === "night" && (
+                <div className="rounded-lg bg-[#3a0d0d]/90 border border-[#ff5a4e]/40 px-2.5 py-0.5 text-[10px] font-bold" style={{ color: HEX.red }}>
+                  ANOMALÍAS: {hud.enemiesAlive}
+                </div>
+              )}
+            </div>
+
+            {/* economía */}
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="flex items-center gap-3 rounded-xl border border-[#223350] bg-[#0f1b31]/90 px-3 py-2 backdrop-blur">
+                <span className="flex items-center gap-1 font-display text-xs" style={{ color: HEX.gold }}>
+                  <Coins size={14} /> {hud.coins}
+                </span>
+                {hud.keys > 0 && (
+                  <span className="flex items-center gap-1 font-display text-xs" style={{ color: HEX.cyan }}>
+                    <KeyRound size={14} /> {hud.keys}
                   </span>
                 )}
               </div>
-
-              <div className="flex flex-col items-end gap-1.5">
-                <Hearts n={hud.hearts} />
-                <div className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-line bg-deep/80 px-2.5 py-1 backdrop-blur-sm">
-                  <Coins size={13} style={{ color: HEX.amber }} />
-                  <span className="font-display text-xs text-paper">{hud.money} R$</span>
-                </div>
-                <div className="flex items-center gap-1 text-[11px] text-fog">
-                  <Users size={11} /> {hud.waiting} en fila
-                </div>
+              <div className="flex items-center gap-3 rounded-xl border border-[#223350] bg-[#0f1b31]/90 px-3 py-1.5">
+                <span className="font-display text-xs text-[#e9f1fc]">{hud.score} PTS</span>
+                <span className="flex items-center gap-1 text-[10px] text-[#8fa4c2]"><Trophy size={11} style={{ color: HEX.amber }} />{hud.best}</span>
               </div>
-            </div>
-
-            {/* botones pausa/mute */}
-            <div className="absolute right-3 top-28 z-20 flex flex-col gap-2 md:top-20">
-              <button
-                onClick={() => gameRef.current?.togglePause()}
-                className="cursor-pointer rounded-lg border border-line bg-deep/80 p-2 text-fog backdrop-blur-sm transition hover:text-paper"
-                aria-label="Pausa"
-              >
-                <Pause size={15} />
-              </button>
-              <button
-                onClick={toggleMute}
-                className="cursor-pointer rounded-lg border border-line bg-deep/80 p-2 text-fog backdrop-blur-sm transition hover:text-paper"
-                aria-label={muted ? "Activar sonido" : "Silenciar"}
-              >
-                {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-              </button>
-            </div>
-
-            {/* prompt de atención */}
-            {promptVisible && !isTouch && (
-              <div className="pointer-events-none absolute bottom-20 left-1/2 z-20 -translate-x-1/2">
-                <div className="font-display flex items-center gap-2 rounded-xl border px-4 py-2 text-xs backdrop-blur-sm"
-                  style={{ borderColor: HEX.lime, background: "rgba(7,13,24,0.85)", color: HEX.lime }}>
-                  <kbd className="rounded bg-lime px-1.5 py-0.5 text-[10px] text-deep">E</kbd>
-                  ATENDER HUÉSPED
+              {hud.combo >= 2 && (
+                <div key={hud.combo} className="animate-pop rounded-lg px-3 py-1 font-display text-lg" style={{ background: "rgba(168,230,60,0.15)", color: HEX.lime, border: `1px solid ${HEX.lime}55` }}>
+                  COMBO ×{hud.combo}
                 </div>
-              </div>
-            )}
-
-            {/* pausa */}
-            {phase === "paused" && (
-              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-deep/80 backdrop-blur-sm">
-                <p className="font-display text-2xl text-paper">PAUSA</p>
-                <p className="text-sm text-fog">El hotel también descansa. Poco.</p>
-                <GameButton onClick={() => gameRef.current?.togglePause()}>
-                  <Play size={16} /> CONTINUAR
-                </GameButton>
-              </div>
-            )}
-
-            {/* ------------------ controles táctiles ------------------ */}
-            {isTouch && phase === "play" && (
-              <>
-                <div
-                  ref={joyRef}
-                  className="absolute bottom-5 left-5 z-20 h-28 w-28 rounded-full border-2 border-line bg-deep/60 backdrop-blur-sm"
-                  style={{ touchAction: "none" }}
-                  onPointerDown={(e) => {
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                    joyActive.current = true;
-                    updateJoy(e.clientX, e.clientY);
-                  }}
-                  onPointerMove={(e) => joyActive.current && updateJoy(e.clientX, e.clientY)}
-                  onPointerUp={endJoy}
-                  onPointerCancel={endJoy}
-                >
-                  <div
-                    className="absolute h-12 w-12 rounded-full border border-line bg-panel2 shadow-lg"
-                    style={{
-                      left: `calc(50% - 24px + ${knob.x}px)`,
-                      top: `calc(50% - 24px + ${knob.y}px)`,
-                    }}
-                  />
-                </div>
-                <div className="absolute bottom-6 right-5 z-20 flex gap-3">
-                  <button
-                    onClick={() => gameRef.current?.pressJump()}
-                    className="font-display h-16 w-16 rounded-full border border-line bg-panel/90 text-[10px] text-fog backdrop-blur-sm active:scale-95"
-                  >
-                    SALTAR
-                  </button>
-                  <button
-                    onClick={() => gameRef.current?.pressInteract()}
-                    className="font-display h-16 w-16 rounded-full border text-[10px] shadow-lg active:scale-95"
-                    style={{
-                      borderColor: promptVisible ? HEX.lime : "var(--color-line)",
-                      background: promptVisible ? HEX.lime : "rgba(19,33,60,0.9)",
-                      color: promptVisible ? "#08101f" : "var(--color-fog)",
-                    }}
-                  >
-                    ATENDER
-                  </button>
-                </div>
-              </>
-            )}
-          </>
-        )}
-
-        {/* ------------------- ficha de registro ------------------- */}
-        {card && (
-          <div className="absolute inset-0 z-40 flex items-center justify-center bg-deep/70 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl border-2 bg-panel p-5 shadow-2xl" style={{ borderColor: HEX.amber }}>
-              <div className="mb-3 flex items-center justify-between">
-                <p className="font-display text-xs tracking-widest" style={{ color: HEX.amber }}>
-                  FICHA DE REGISTRO
-                </p>
-                <span className="flex items-center gap-1 text-[11px] text-fog">
-                  <Clock size={12} /> verificación obligatoria
-                </span>
-              </div>
-
-              <div className="mb-4 flex items-start gap-4">
-                {/* foto declarada */}
-                <div className="flex flex-col items-center gap-1">
-                  <div
-                    className="h-16 w-16 rounded-lg border-2 border-line shadow-inner"
-                    style={{ background: card.cardColor }}
-                  />
-                  <span className="text-[10px] uppercase tracking-wider text-fog">foto ficha</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-display truncate text-lg text-paper">{card.name}</p>
-                  <p className="text-xs text-fog">{card.reason}</p>
-                </div>
-              </div>
-
-              <div className="mb-4 grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-lg border border-line bg-deep px-2 py-2">
-                  <p className="text-[10px] uppercase tracking-wider text-fog">habitación</p>
-                  <p className="font-display text-sm text-paper">{card.room}</p>
-                </div>
-                <div className="rounded-lg border border-line bg-deep px-2 py-2">
-                  <p className="text-[10px] uppercase tracking-wider text-fog">llegada</p>
-                  <p className="font-display text-sm text-paper">{card.hour}</p>
-                </div>
-                <div className="rounded-lg border border-line bg-deep px-2 py-2">
-                  <p className="text-[10px] uppercase tracking-wider text-fog">noches</p>
-                  <p className="font-display text-sm text-paper">{card.nights}</p>
-                </div>
-              </div>
-
-              <div className="mb-4 rounded-lg border border-line bg-deep/60 px-3 py-2 text-[11px] leading-relaxed text-fog">
-                <span className="font-display" style={{ color: HEX.cyan }}>MANUAL:</span>{" "}
-                compara el color de la ficha con la chaqueta real del huésped · habitaciones válidas
-                P-01 a P-99 · llegadas válidas 22:00–04:00 · mira bien sus ojos, su sombra y sus piernas.
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => gameRef.current?.decide(false)}
-                  className="font-display flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-black/30 px-4 py-3 text-xs shadow-[0_5px_0_rgba(0,0,0,0.4)] transition-transform hover:-translate-y-0.5 active:translate-y-0.5"
-                  style={{ background: HEX.red, color: "#1a0505" }}
-                >
-                  <ShieldAlert size={16} /> DENUNCIAR <span className="opacity-60">[Q]</span>
-                </button>
-                <button
-                  onClick={() => gameRef.current?.decide(true)}
-                  className="font-display flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-black/30 px-4 py-3 text-xs shadow-[0_5px_0_rgba(0,0,0,0.4)] transition-transform hover:-translate-y-0.5 active:translate-y-0.5"
-                  style={{ background: HEX.lime, color: "#08101f" }}
-                >
-                  <BadgeCheck size={16} /> DAR ENTRADA <span className="opacity-60">[E]</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --------------------- intro de piso --------------------- */}
-        {showIntroCard && hud && !over && (
-          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-5 bg-deep/85 p-6 text-center backdrop-blur-sm">
-            <p className="font-display text-xs tracking-[0.4em]" style={{ color: HEX.cyan }}>
-              {hud.floorIndex === 0 ? "TURNO 1 · 12:00 AM" : `TURNO ${hud.floorIndex + 1} · ASCENSOR`}
-            </p>
-            <div>
-              <p className="font-display text-4xl md:text-5xl" style={{ color: HEX.amber }}>
-                {hud.floorCode}
-              </p>
-              <h3 className="font-display mt-2 text-xl text-paper md:text-2xl">{hud.floorName}</h3>
-            </div>
-            <p className="max-w-md text-sm leading-relaxed text-fog">{hud.floorName && "Atiende la recepción hasta las 6:00 AM. Los huéspedes normales entran y pagan. Las anomalías se denuncian: ojos rojos, cuerpo gris, piernas imposibles, sombra ausente, flotación o fichas falsificadas."}</p>
-            <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] text-fog">
-              {isTouch ? (
-                <>
-                  <span className="flex items-center gap-1"><Gamepad2 size={13} /> joystick para moverte</span>
-                  <span>·</span>
-                  <span className="flex items-center gap-1"><MousePointer2 size={13} /> arrastra fuera del joystick para girar la cámara</span>
-                </>
-              ) : (
-                <>
-                  <span className="flex items-center gap-1"><Gamepad2 size={13} /> WASD / flechas</span>
-                  <span>·</span>
-                  <span>ESPACIO salta</span>
-                  <span>·</span>
-                  <span>E atiende</span>
-                  <span>·</span>
-                  <span className="flex items-center gap-1"><MousePointer2 size={13} /> arrastra para la cámara</span>
-                </>
               )}
+              <button
+                onClick={() => { setMuted((m) => { gameRef.current?.setMuted(!m); return !m; }); }}
+                className="rounded-lg border border-[#223350] bg-[#0f1b31]/90 p-1.5 text-[#8fa4c2] hover:text-[#e9f1fc]"
+                aria-label="Silenciar"
+              >
+                {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+              </button>
             </div>
-            <GameButton
-              onClick={() => {
-                if (hud.floorIndex > 0) gameRef.current?.beginShift();
-                else gameRef.current?.beginShift();
-              }}
-            >
-              <Play size={17} /> {hud.floorIndex === 0 ? "EMPEZAR TURNO" : "BAJAR EN EL PISO"}
-            </GameButton>
-            {!booted && <p className="text-xs text-fog">cargando el hotel…</p>}
           </div>
-        )}
 
-        {/* --------------------- noche superada --------------------- */}
-        {cleared && phase === "cleared" && (
-          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-deep/85 p-6 text-center backdrop-blur-sm">
-            <p className="font-display text-xs tracking-[0.4em]" style={{ color: HEX.lime }}>
-              06:00 AM · AMANECE
-            </p>
-            <h3 className="font-display text-3xl text-paper md:text-4xl">NOCHE SUPERADA</h3>
-            <p className="max-w-sm text-sm text-fog">
-              El ascensor se abre con un ding demasiado amable. Abajo siempre hay otro piso.
-            </p>
-            <div className="flex gap-4 text-sm">
-              <span className="flex items-center gap-1.5 text-paper"><Coins size={15} style={{ color: HEX.amber }} /> {cleared.money} R$</span>
-              <span className="flex items-center gap-1.5 text-paper"><BadgeCheck size={15} style={{ color: HEX.lime }} /> {cleared.correct} aciertos</span>
-              <span className="flex items-center gap-1.5 text-paper"><ShieldAlert size={15} style={{ color: HEX.red }} /> {cleared.mistakes} errores</span>
+          {/* prompt de interacción */}
+          {hud.prompt && (
+            <div className="absolute bottom-36 sm:bottom-24 left-1/2 z-20 -translate-x-1/2 animate-pop">
+              <div className="flex items-center gap-2 rounded-full border px-4 py-2 backdrop-blur" style={{ borderColor: `${HEX.lime}66`, background: "rgba(10,18,32,0.9)" }}>
+                {!isTouch.current && <kbd className="rounded bg-[#223350] px-1.5 py-0.5 font-display text-[10px] text-[#e9f1fc]">E</kbd>}
+                <span className="text-xs font-bold" style={{ color: HEX.lime }}>{hud.prompt}</span>
+              </div>
             </div>
-            <GameButton
-              onClick={() => {
-                setCleared(null);
-                gameRef.current?.nextFloor();
-              }}
-            >
-              <ArrowRight size={17} /> SUBIR AL SIGUIENTE PISO
-            </GameButton>
+          )}
+
+          {/* banner de oleada */}
+          {banner && (
+            <div key={banner.id} className="absolute inset-x-0 top-[22%] z-20 flex justify-center animate-banner">
+              <div className="text-center">
+                <div className="font-display text-2xl sm:text-4xl drop-shadow-[0_4px_0_rgba(0,0,0,0.6)]" style={{ color: banner.title.includes("GERENTE") ? HEX.red : banner.title.includes("6:00") ? HEX.lime : HEX.amber }}>
+                  {banner.title}
+                </div>
+                <div className="mt-1 text-xs sm:text-sm text-[#c9d6ec]">{banner.sub}</div>
+              </div>
+            </div>
+          )}
+
+          {/* barra de construcción */}
+          <div className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2">
+            <div className="flex items-end gap-1.5">
+              {BUILD_SLOTS.map((slot, i) => {
+                const afford = hud.coins >= slot.cost;
+                const active = buildMode === slot.kind;
+                const Icon = slot.icon;
+                return (
+                  <button
+                    key={slot.kind}
+                    onClick={() => gameRef.current?.selectBuild(active ? null : slot.kind)}
+                    className={`relative flex w-[76px] sm:w-[92px] flex-col items-center gap-0.5 rounded-xl border px-1 py-2 backdrop-blur transition-all ${
+                      active ? "scale-105" : afford ? "hover:scale-105" : "opacity-45"
+                    }`}
+                    style={{
+                      borderColor: active ? HEX.lime : "#223350",
+                      background: active ? "rgba(168,230,60,0.12)" : "rgba(15,27,49,0.9)",
+                      boxShadow: active ? `0 0 14px ${HEX.lime}44` : "none",
+                    }}
+                  >
+                    <span className="absolute -top-1.5 -left-1 rounded px-1 font-display text-[9px] bg-[#223350] text-[#c9d6ec]">{i + 1}</span>
+                    <Icon size={18} style={{ color: active ? HEX.lime : "#8fa4c2" }} />
+                    <span className="font-display text-[8.5px] text-[#c9d6ec]">{slot.label}</span>
+                    <span className="flex items-center gap-0.5 text-[9px]" style={{ color: afford ? HEX.gold : HEX.red }}>
+                      <Coins size={9} /> {slot.cost}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {buildMode && (
+              <div className="mt-1 text-center text-[10px] font-bold animate-pulse" style={{ color: HEX.lime }}>
+                {isTouch.current ? "TOCA EL SUELO PARA COLOCAR" : "CLIC PARA COLOCAR · Q CANCELAR"}
+              </div>
+            )}
           </div>
-        )}
 
-        {/* ------------------------ game over ------------------------ */}
-        {over && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-deep/90 p-6 text-center backdrop-blur-sm">
-            <p className="font-display text-xs tracking-[0.4em]" style={{ color: HEX.red }}>
-              EXPEDIENTE CERRADO
-            </p>
-            <h3 className="font-display text-3xl text-paper md:text-4xl">DESPEDEDO</h3>
-            <p className="max-w-sm text-sm text-fog">
-              El hotel te entrega un sobre con tu última propina y una foto tuya que no recuerdas.
-              Mañana hay otra plaza libre. Siempre la hay.
-            </p>
-            <div className="flex flex-wrap justify-center gap-4 text-sm">
-              <span className="flex items-center gap-1.5 text-paper"><Gauge size={15} style={{ color: HEX.cyan }} /> pisos: {over.floorsCleared}</span>
-              <span className="flex items-center gap-1.5 text-paper"><Coins size={15} style={{ color: HEX.amber }} /> {over.money} R$</span>
-              <span className="flex items-center gap-1.5 text-paper"><BadgeCheck size={15} style={{ color: HEX.lime }} /> {over.correct} aciertos</span>
+          {/* pausa */}
+          <button
+            onClick={() => gameRef.current?.togglePause()}
+            className="absolute right-2 bottom-3 sm:bottom-4 z-20 rounded-lg border border-[#223350] bg-[#0f1b31]/90 p-2 text-[#8fa4c2] hover:text-[#e9f1fc]"
+            aria-label="Pausa"
+          >
+            <Pause size={16} />
+          </button>
+        </>
+      )}
+
+      {/* ====================== controles táctiles ====================== */}
+      {isTouch.current && !showIntro && phase !== "over" && phase !== "intro" && (
+        <>
+          <div
+            className="absolute bottom-0 left-0 z-20 h-44 w-44 touch-none"
+            onPointerDown={joyDown}
+            onPointerMove={joyMove}
+            onPointerUp={joyUp}
+            onPointerCancel={joyUp}
+          >
+            <div className={`absolute bottom-6 left-6 h-28 w-28 rounded-full border-2 ${joyKnob.active ? "border-[#a8e63c]/60" : "border-[#223350]"} bg-[#0f1b31]/50 backdrop-blur`}>
+              <div
+                className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#a8e63c]/40 bg-[#1a2740]/90"
+                style={{ transform: `translate(calc(-50% + ${joyKnob.x}px), calc(-50% + ${joyKnob.y}px))` }}
+              />
             </div>
-            <GameButton
-              onClick={() => {
-                setOver(null);
-                gameRef.current?.restart();
-              }}
-            >
-              <RotateCcw size={17} /> OTRO TURNO
-            </GameButton>
           </div>
-        )}
-
-        {/* --------------------------- toasts --------------------------- */}
-        <div className="pointer-events-none absolute bottom-4 left-1/2 z-30 flex w-max max-w-[92%] -translate-x-1/2 flex-col items-center gap-1.5">
-          {toasts.map((t) => (
-            <div
-              key={t.id}
-              className="font-display rounded-lg border px-3 py-1.5 text-[11px] backdrop-blur-sm"
-              style={{
-                borderColor: t.kind === "ok" ? HEX.lime : t.kind === "bad" ? HEX.red : "var(--color-line)",
-                background: "rgba(7,13,24,0.85)",
-                color: t.kind === "ok" ? HEX.lime : t.kind === "bad" ? HEX.red : "var(--color-fog)",
-              }}
-            >
-              {t.msg}
+          <div className="absolute bottom-24 right-3 z-20 flex flex-col items-end gap-2">
+            <div className="flex gap-2">
+              <TouchBtn label="SALTO" onPress={() => gameRef.current?.pressJump()} color={HEX.cyan} />
+              <TouchBtn label="TURBO" onPress={() => gameRef.current?.pressDash()} color={HEX.amber} />
             </div>
-          ))}
+            <div className="flex gap-2">
+              <TouchBtn label="USAR" onPress={() => gameRef.current?.pressInteract()} color={HEX.gold} small />
+              <TouchBtn label="GOLPEAR" big onPress={() => gameRef.current?.pressAttack()} color={HEX.red} />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ============================== intro ============================== */}
+      {showIntro && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-gradient-to-b from-[#070d18ee] via-[#0a1220dd] to-[#070d18f5] p-4">
+          <div className="max-w-lg text-center">
+            <div className="font-display text-4xl sm:text-5xl leading-none" style={{ color: HEX.gold }}>
+              HOTEL ∞
+            </div>
+            <div className="mt-1 font-display text-xl sm:text-2xl" style={{ color: HEX.red }}>
+              NOCHE INFINITA
+            </div>
+            <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-[#c9d6ec]">
+              Explora habitaciones, saquea monedas, <b className="text-[#e9f1fc]">construye defensas</b> y
+              sobrevive a las <b style={{ color: HEX.red }}>3 oleadas de anomalías</b> de cada noche.
+              Sube al ascensor… los pisos nunca terminan.
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-2 text-left text-[11px] sm:grid-cols-4">
+              {[
+                { icon: Gamepad2, txt: "WASD moverse · ratón cámara" },
+                { icon: Swords, txt: "Clic / J: golpe de escoba" },
+                { icon: Shield, txt: "1·2·3: construir defensas" },
+                { icon: MousePointer2, txt: "E: puertas · cofres · ascensor" },
+              ].map((c, i) => (
+                <div key={i} className="flex items-start gap-2 rounded-lg border border-[#223350] bg-[#0f1b31]/80 p-2">
+                  <c.icon size={14} style={{ color: HEX.cyan, flexShrink: 0 }} />
+                  <span className="text-[#c9d6ec]">{c.txt}</span>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={play}
+              className="mt-6 inline-flex items-center gap-2 rounded-2xl px-10 py-4 font-display text-lg text-[#08101f] shadow-[0_8px_0_rgba(90,130,20,1)] transition-all hover:translate-y-0.5 hover:shadow-[0_5px_0_rgba(90,130,20,1)] active:shadow-none"
+              style={{ background: HEX.lime }}
+            >
+              <Play size={20} fill="#08101f" /> JUGAR
+            </button>
+            {isTouch.current && (
+              <div className="mt-3 text-[11px] text-[#8fa4c2]">Móvil: joystick + botones · barra de construcción abajo</div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* ------------------- ayuda bajo el lienzo ------------------- */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-fog">
-        {!isTouch ? (
-          <>
-            <span><kbd className="rounded bg-panel px-1.5 py-0.5 font-display text-[10px] text-paper">WASD</kbd> moverse</span>
-            <span><kbd className="rounded bg-panel px-1.5 py-0.5 font-display text-[10px] text-paper">ESPACIO</kbd> saltar</span>
-            <span><kbd className="rounded bg-panel px-1.5 py-0.5 font-display text-[10px] text-paper">E</kbd> atender / aceptar</span>
-            <span><kbd className="rounded bg-panel px-1.5 py-0.5 font-display text-[10px] text-paper">Q</kbd> denunciar</span>
-            <span><kbd className="rounded bg-panel px-1.5 py-0.5 font-display text-[10px] text-paper">P</kbd> pausa</span>
-            <span className="flex items-center gap-1"><MousePointer2 size={11} /> arrastrar = cámara</span>
-          </>
-        ) : (
-          <span className="flex items-center gap-1"><Sparkles size={11} /> joystick + botones en pantalla</span>
-        )}
-      </div>
-
-      {/* ----------------------- cómo jugar ----------------------- */}
-      <div id="reglas" className="mt-12 grid gap-4 md:grid-cols-3">
-        {[
-          {
-            icon: <Users size={18} style={{ color: HEX.cyan }} />,
-            title: "ATIENDE LA FILA",
-            body: "Cada noche llegan huéspedes a recepción. Acércate, revisa su ficha y decide: ¿entran o se denuncian? Los normales dejan propina; la fila no espera para siempre.",
-          },
-          {
-            icon: <Ban size={18} style={{ color: HEX.red }} />,
-            title: "CAZA ANOMALÍAS",
-            body: "Ojos rojos brillantes, cuerpo gris, piernas larguísimas, flotación, cara vacía o sin sombra. También mienten en la ficha: color distinto, habitación P-∞ o llegada a las 04:44.",
-          },
-          {
-            icon: <BookOpen size={18} style={{ color: HEX.amber }} />,
-            title: "SUBE EL HOTEL",
-            body: "Sobrevive de 12:00 AM a 6:00 AM y el ascensor bajará a un piso peor: P-13, el Piso Espejo, la Caldera y más allá, pisos que no aparecen en ningún plano.",
-          },
-        ].map((c) => (
-          <div key={c.title} className="rounded-2xl border border-line bg-panel p-5">
-            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-deep">
-              {c.icon}
+      {/* ============================== pausa ============================== */}
+      {phase === "paused" && !gameOver && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#070d18e0] backdrop-blur-sm">
+          <div className="w-72 rounded-2xl border border-[#223350] bg-[#0f1b31] p-6 text-center">
+            <div className="font-display text-xl text-[#e9f1fc]">PAUSA</div>
+            <div className="mt-4 flex flex-col gap-2">
+              <button onClick={() => gameRef.current?.togglePause()} className="flex items-center justify-center gap-2 rounded-xl py-3 font-display text-sm text-[#08101f]" style={{ background: HEX.lime }}>
+                <Play size={16} /> CONTINUAR
+              </button>
+              <button onClick={restart} className="flex items-center justify-center gap-2 rounded-xl border border-[#223350] py-3 font-display text-sm text-[#c9d6ec]">
+                <RotateCcw size={15} /> REINICIAR
+              </button>
             </div>
-            <h4 className="font-display mb-2 text-sm text-paper">{c.title}</h4>
-            <p className="text-xs leading-relaxed text-fog">{c.body}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ============================== mejoras ============================== */}
+      {upgrades && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#070d18e6] p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl text-center">
+            <div className="font-display text-2xl" style={{ color: HEX.gold }}>PISO SUPERADO</div>
+            <p className="mt-1 text-sm text-[#c9d6ec]">Elige una mejora para el siguiente piso:</p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              {upgrades.map((u) => {
+                const Icon = UPGRADE_ICONS[u.icon] ?? Zap;
+                return (
+                  <button
+                    key={u.id}
+                    onClick={() => gameRef.current?.chooseUpgrade(u.id)}
+                    className="group flex flex-col items-center gap-2 rounded-2xl border-2 border-[#223350] bg-[#0f1b31] p-5 transition-all hover:-translate-y-1 hover:border-[#a8e63c] hover:shadow-[0_10px_30px_rgba(168,230,60,0.15)]"
+                  >
+                    <span className="rounded-xl p-3" style={{ background: "rgba(168,230,60,0.12)" }}>
+                      <Icon size={28} className="text-[#a8e63c]" />
+                    </span>
+                    <span className="font-display text-sm text-[#e9f1fc]">{u.title}</span>
+                    <span className="text-[11px] leading-snug text-[#8fa4c2]">{u.desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================== game over ============================== */}
+      {gameOver && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#180a0af0] p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-[#ff5a4e]/30 bg-[#0f1b31] p-8 text-center">
+            <div className="font-display text-3xl" style={{ color: HEX.red }}>FIN DEL TURNO</div>
+            <p className="mt-1 text-sm text-[#c9d6ec]">Las anomalías te alcanzaron…</p>
+            <div className="mt-5 grid grid-cols-2 gap-2 text-left">
+              {[
+                { k: "PUNTOS", v: gameOver.score, hot: true },
+                { k: "RÉCORD", v: gameOver.best, hot: false },
+                { k: "BAJAS", v: gameOver.kills, hot: false },
+                { k: "MONEDAS", v: gameOver.coinsEarned, hot: false },
+                { k: "HABITACIONES", v: gameOver.rooms, hot: false },
+                { k: "PISOS", v: gameOver.floors, hot: false },
+              ].map((s) => (
+                <div key={s.k} className="rounded-xl border border-[#223350] bg-[#0a1220] px-4 py-3">
+                  <div className="text-[10px] tracking-widest text-[#8fa4c2]">{s.k}</div>
+                  <div className="font-display text-xl" style={{ color: s.hot ? HEX.gold : "#e9f1fc" }}>{s.v}</div>
+                </div>
+              ))}
+            </div>
+            {gameOver.score >= gameOver.best && gameOver.score > 0 && (
+              <div className="mt-3 font-display text-sm animate-pulse" style={{ color: HEX.lime }}>¡NUEVO RÉCORD!</div>
+            )}
+            <button
+              onClick={restart}
+              className="mt-6 inline-flex items-center gap-2 rounded-2xl px-8 py-4 font-display text-base text-[#08101f] shadow-[0_6px_0_rgba(90,130,20,1)] transition-all hover:translate-y-0.5"
+              style={{ background: HEX.lime }}
+            >
+              <RotateCcw size={18} /> OTRA NOCHE
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* toasts */}
+      <div className="pointer-events-none absolute left-1/2 top-[13%] z-20 flex w-max -translate-x-1/2 flex-col items-center gap-1.5">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className="animate-pop rounded-full border px-4 py-1.5 text-xs font-bold backdrop-blur"
+            style={{
+              borderColor: t.kind === "ok" ? `${HEX.lime}66` : t.kind === "bad" ? `${HEX.red}66` : "#223350",
+              background: "rgba(10,18,32,0.92)",
+              color: t.kind === "ok" ? HEX.lime : t.kind === "bad" ? HEX.red : "#c9d6ec",
+            }}
+          >
+            {t.msg}
           </div>
         ))}
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-deep p-4">
-        <p className="text-xs text-fog">
-          Esta demo web es el <span className="text-paper">prototipo del loop central</span> del GDD.
-          El juego completo se construye en Roblox Studio con Luau.
-        </p>
-        <button
-          onClick={onOpenGdd}
-          className="font-display inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-panel px-4 py-2 text-xs text-paper transition hover:border-amber hover:text-amber"
-        >
-          LEER EL GDD <ArrowRight size={13} />
-        </button>
-      </div>
+      {/* animaciones locales */}
+      <style>{`
+        @keyframes hurtFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
+        .animate-hurt { animation: hurtFlash 0.5s ease-out forwards; }
+        @keyframes popIn { 0% { transform: scale(0.7); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .animate-pop { animation: popIn 0.18s ease-out; }
+        @keyframes bannerIn { 0% { transform: scale(0.8); opacity: 0; } 12% { transform: scale(1.05); opacity: 1; } 20% { transform: scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
+        .animate-banner { animation: bannerIn 3.2s ease-out forwards; }
+      `}</style>
     </div>
+  );
+}
+
+function TouchBtn({
+  label, onPress, color, big, small,
+}: {
+  label: string;
+  onPress: () => void;
+  color: string;
+  big?: boolean;
+  small?: boolean;
+}) {
+  const size = big ? "h-20 w-20 text-[11px]" : small ? "h-12 w-12 text-[9px]" : "h-14 w-14 text-[10px]";
+  return (
+    <button
+      onPointerDown={(e) => { e.preventDefault(); onPress(); }}
+      className={`${size} rounded-full border-2 font-display backdrop-blur active:scale-90 transition-transform`}
+      style={{ borderColor: `${color}88`, background: `${color}22`, color }}
+    >
+      {label}
+    </button>
   );
 }

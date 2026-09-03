@@ -104,6 +104,69 @@ export class GameAudio {
     this.noise(1.0, 0.05, 300);
   }
 
+  /* ------------------- combate / acción ------------------- */
+
+  swing(): void {
+    this.noise(0.12, 0.14, 2600);
+    this.tone(320, 0.08, "sine", 0.05, 480);
+  }
+  hitEnemy(): void {
+    this.noise(0.08, 0.3, 900);
+    this.tone(160, 0.1, "square", 0.12, 90);
+  }
+  enemyDie(): void {
+    this.tone(420, 0.3, "sawtooth", 0.1, 80);
+    this.noise(0.25, 0.18, 600);
+  }
+  coin(): void {
+    this.tone(1240, 0.09, "square", 0.07);
+    this.tone(1860, 0.14, "square", 0.06, undefined, 0.06);
+  }
+  key(): void {
+    [880, 1174, 1568].forEach((f, i) => this.tone(f, 0.16, "triangle", 0.1, undefined, i * 0.08));
+  }
+  build(): void {
+    this.noise(0.12, 0.3, 700);
+    this.tone(140, 0.14, "square", 0.12, 100);
+  }
+  buildError(): void {
+    this.tone(180, 0.14, "square", 0.08, 120);
+  }
+  turret(): void {
+    this.tone(980, 0.07, "square", 0.05, 1400);
+  }
+  hurt(): void {
+    this.tone(220, 0.18, "sawtooth", 0.16, 110);
+    this.noise(0.14, 0.16, 500);
+  }
+  dash(): void {
+    this.noise(0.14, 0.1, 3400);
+  }
+  wave(): void {
+    this.tone(98, 0.9, "sawtooth", 0.14, 82);
+    this.tone(196, 0.7, "square", 0.05, 165, 0.1);
+    this.noise(0.8, 0.08, 300);
+  }
+  door(): void {
+    this.noise(0.3, 0.1, 420);
+    this.tone(90, 0.24, "sine", 0.08, 70);
+  }
+  locked(): void {
+    this.tone(240, 0.1, "square", 0.09, 200);
+    this.tone(200, 0.12, "square", 0.08, 160, 0.11);
+  }
+  upgrade(): void {
+    [523, 659, 784, 1047, 1319].forEach((f, i) => this.tone(f, 0.22, "triangle", 0.11, undefined, i * 0.09));
+  }
+  heal(): void {
+    this.tone(520, 0.2, "sine", 0.09, 780);
+    this.tone(780, 0.25, "sine", 0.07, 1040, 0.1);
+  }
+  roar(): void {
+    this.tone(65, 1.2, "sawtooth", 0.2, 48);
+    this.noise(1.1, 0.16, 260);
+  }
+
   /* --------------------------- ambiente --------------------------- */
 
   startAmbient(): void {

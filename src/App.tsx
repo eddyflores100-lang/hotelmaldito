@@ -874,7 +874,7 @@ function Footer() {
           <span className="font-display text-xs text-paper">
             GAME<span className="text-amber">LAB</span>
           </span>
-          <span className="ml-3 text-xs text-fog">Roblox Game Lab · v2.0 · 2026</span>
+          <span className="ml-3 text-xs text-fog">Roblox Game Lab · v3.0 · 2026</span>
         </div>
         <p className="max-w-md text-xs leading-relaxed text-fog">
           Documento conceptual no oficial, sin afiliación con Roblox Corporation.
@@ -888,7 +888,7 @@ function Footer() {
 /* ------------------------------------- app ------------------------------------ */
 
 export default function App() {
-  const [view, setView] = useState<View>("lab");
+  const [view, setView] = useState<View>("demo");
   const switchView = (v: View) => {
     if (v === view) {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -914,7 +914,7 @@ export default function App() {
             />
           </>
         ) : view === "demo" ? (
-          <DemoView onOpenLab={() => switchView("lab")} onOpenGdd={() => switchView("gdd")} />
+          <DemoView />
         ) : view === "gdd" ? (
           <GddView onBack={() => switchView("lab")} onOpenRoadmap={() => switchView("roadmap")} />
         ) : view === "roadmap" ? (
