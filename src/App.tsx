@@ -853,7 +853,7 @@ function Footer() {
           <span className="font-display text-xs text-paper">
             GAME<span className="text-amber">LAB</span>
           </span>
-          <span className="ml-3 text-xs text-fog">Doc de conceptos · v2.6 · 2026</span>
+          <span className="ml-3 text-xs text-fog">Roblox Game Lab · v1.0 · 2026</span>
         </div>
         <p className="max-w-md text-xs leading-relaxed text-fog">
           Documento conceptual no oficial, sin afiliación con Roblox Corporation.
