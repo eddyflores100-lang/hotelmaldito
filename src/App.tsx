@@ -12,6 +12,7 @@ import {
 import GddView from "./components/Gdd";
 import RoadmapView from "./components/Roadmap";
 import CodebaseView from "./components/Codebase";
+import DemoView from "./components/Demo";
 import { useCountUp, useInView } from "./hooks";
 import {
   GameIcon,
@@ -130,7 +131,7 @@ function FloatingCubes() {
 
 /* ----------------------------------- top HUD --------------------------------- */
 
-type View = "lab" | "gdd" | "roadmap" | "code";
+type View = "lab" | "gdd" | "roadmap" | "demo" | "code";
 
 function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void }) {
   const linksByView: Record<View, [string, string, string][]> = {
@@ -156,6 +157,10 @@ function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void })
       ["SRC", "Archivos", "#codigo"],
       ["SRC", "Explorer", "#codigo"],
       ["SRC", "Instalación", "#codigo"],
+    ],
+    demo: [
+      ["DEMO", "Turno de noche", "#demo-top"],
+      ["DEMO", "Cómo jugar", "#demo-como"],
     ],
   };
   const links = linksByView[view];
@@ -207,6 +212,14 @@ function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void })
               PLAN
             </button>
             <button
+              onClick={() => onSelect("demo")}
+              className={`font-display flex cursor-pointer items-center gap-1.5 border-l border-line px-3 py-1.5 text-[11px] tracking-wider transition-all duration-200 ${
+                view === "demo" ? "bg-amber text-deep" : "text-fog hover:text-paper"
+              }`}
+            >
+              ▶ DEMO
+            </button>
+            <button
               onClick={() => onSelect("code")}
               className={`font-display cursor-pointer border-l border-line px-3 py-1.5 text-[11px] tracking-wider transition-all duration-200 ${
                 view === "code" ? "bg-cyan text-deep" : "text-fog hover:text-paper"
@@ -227,7 +240,7 @@ function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void })
 
 /* ---------------------------------- opening ---------------------------------- */
 
-function Opening() {
+function Opening({ onPlayDemo }: { onPlayDemo: () => void }) {
   return (
     <section id="top" className="relative flex min-h-screen flex-col overflow-hidden pt-14">
       <FloatingCubes />
@@ -262,13 +275,13 @@ function Opening() {
           </Reveal>
           <Reveal delay={480}>
             <div className="mt-9 flex flex-wrap items-center gap-4">
-              <a
-                href="#conceptos"
-                className="font-display group inline-flex items-center gap-3 border-2 border-amber bg-amber px-7 py-3.5 text-sm text-deep transition-all duration-200 hover:-translate-y-0.5 hover:bg-transparent hover:text-amber hover:shadow-[0_0_32px_rgba(255,160,47,0.35)] active:translate-y-0"
+              <button
+                onClick={onPlayDemo}
+                className="font-display group inline-flex cursor-pointer items-center gap-3 border-2 border-amber bg-amber px-7 py-3.5 text-sm text-deep transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_32px_rgba(255,160,47,0.35)] active:translate-y-0"
               >
-                PRESS START
+                ▶ JUGAR LA DEMO
                 <IconArrow className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
-              </a>
+              </button>
               <a
                 href="#mercado"
                 className="font-display inline-flex items-center gap-3 border-2 border-line px-7 py-3.5 text-sm text-fog transition-all duration-200 hover:border-cyan hover:text-cyan"
@@ -458,7 +471,7 @@ const riskStyles: Record<string, string> = {
   Alto: "text-[#ff6b6b] border-[#ff6b6b]/50 bg-[#ff6b6b]/10",
 };
 
-function ConceptDetail({ game }: { game: GameConcept }) {
+function ConceptDetail({ game, onPlayDemo }: { game: GameConcept; onPlayDemo: () => void }) {
   return (
     <div key={game.id} className="panel-in space-y-10">
       {/* header */}
@@ -486,6 +499,14 @@ function ConceptDetail({ game }: { game: GameConcept }) {
           </div>
         </div>
         <p className="mt-4 max-w-3xl text-base leading-relaxed text-fog md:text-lg">{game.tagline}</p>
+        {game.id === "hotel" && (
+          <button
+            onClick={onPlayDemo}
+            className="font-display mt-5 inline-flex cursor-pointer items-center gap-3 border-2 border-amber bg-amber px-6 py-3 text-xs text-deep transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_32px_rgba(255,160,47,0.35)] active:translate-y-0"
+          >
+            ▶ JUGAR LA DEMO DEL TURNO DE NOCHE
+          </button>
+        )}
       </div>
 
       {/* stat badges */}
@@ -631,7 +652,7 @@ function ConceptDetail({ game }: { game: GameConcept }) {
   );
 }
 
-function Concepts() {
+function Concepts({ onPlayDemo }: { onPlayDemo: () => void }) {
   const [activeId, setActiveId] = useState(games[1].id);
   const active = games.find((g) => g.id === activeId) ?? games[0];
 
@@ -683,7 +704,7 @@ function Concepts() {
           </Reveal>
 
           {/* detail panel */}
-          <ConceptDetail game={active} />
+          <ConceptDetail game={active} onPlayDemo={onPlayDemo} />
         </div>
       </div>
     </section>
@@ -853,7 +874,7 @@ function Footer() {
           <span className="font-display text-xs text-paper">
             GAME<span className="text-amber">LAB</span>
           </span>
-          <span className="ml-3 text-xs text-fog">Roblox Game Lab · v1.0 · 2026</span>
+          <span className="ml-3 text-xs text-fog">Roblox Game Lab · v1.1 · 2026</span>
         </div>
         <p className="max-w-md text-xs leading-relaxed text-fog">
           Documento conceptual no oficial, sin afiliación con Roblox Corporation.
@@ -883,15 +904,17 @@ export default function App() {
       <main className="relative z-10">
         {view === "lab" ? (
           <>
-            <Opening />
+            <Opening onPlayDemo={() => switchView("demo")} />
             <Market />
-            <Concepts />
+            <Concepts onPlayDemo={() => switchView("demo")} />
             <Compare />
             <Verdict
               onOpenGdd={() => switchView("gdd")}
               onOpenRoadmap={() => switchView("roadmap")}
             />
           </>
+        ) : view === "demo" ? (
+          <DemoView onOpenLab={() => switchView("lab")} onOpenGdd={() => switchView("gdd")} />
         ) : view === "gdd" ? (
           <GddView onBack={() => switchView("lab")} onOpenRoadmap={() => switchView("roadmap")} />
         ) : view === "roadmap" ? (

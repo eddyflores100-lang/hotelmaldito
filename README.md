@@ -19,6 +19,25 @@
 
 ---
 
+## 🎮 DEMO JUGABLE — Turno de noche en el Hotel ∞
+
+El loop central del juego ya se puede jugar **en el propio sitio**: pulsa **▶ DEMO** en la navegación (o «Jugar la demo» en el hero) y firma tu contrato de mantenimiento nocturno.
+
+| | |
+|---|---|
+| ![Demo del Hotel ∞ Infinito](docs/screenshots/demo-jugando.jpg) | ![Demo en móvil](docs/screenshots/demo-movil.jpg) |
+| *Piso P-13 — La Piscina Sin Fin* | *Controles táctiles en móvil* |
+
+**Tres pisos, tres reglas, ninguna explicación:**
+
+- 🌊 **P-13 · La Piscina Sin Fin** — completa tareas sin pisar el agua… que se reorganiza tras cada tarea.
+- 🪞 **P-∞ · El Piso Espejo** — controles invertidos y tus reflejos te persiguen para ocupar tu turno.
+- 🔥 **P--1 · La Caldera** — aguanta 75 s alimentando tres calderas que pierden presión sin motivo.
+
+**Mecánicas:** cruceta táctil + WASD/flechas, mantener TRABAJAR frente a una puerta, propinas por tarea, apagones, eventos aleatorios, sistema de corazones (si fallas, te «despiden» con mensaje cómico) y final con rango según propinas (Becario del Vacío → Gerente Eterno ∞).
+
+> La demo demuestra el loop de 90 segundos descrito en el GDD. El juego completo vive en Roblox Studio — el código Luau de referencia está en la vista CÓDIGO.
+
 ## 📖 Sobre el proyecto
 
 **Roblox Game Lab** es un documento interactivo de preproducción para crear juegos *únicos para niños y adolescentes en Roblox*. En lugar de copiar fórmulas de moda, este laboratorio analiza los datos reales del mercado (Q3–Q4 2025), identifica **nichos vacíos** y propone tres conceptos completos con su loop de juego, escenarios, monetización y referencias.
@@ -43,6 +62,7 @@ El concepto ganador — **Hotel ∞ Infinito**, terror cómico cooperativo con p
 | 🔬 **LAB** | Radiografía del mercado con métricas animadas, 5 insights de diseño, 3 conceptos con loop y escenarios, tabla comparativa y veredicto razonado |
 | 🏨 **HOTEL ∞** | GDD completo: pilares, roles, economia de propinas, escenarios firma (Piscina Sin Fin, Piso Espejo, La Caldera), sistemas y UI |
 | 🗺️ **PLAN** | Roadmap de 12 semanas en 4 fases: prototipo vertical → generador procedural → beta cerrada → lanzamiento y live-ops |
+| 🎮 **DEMO** | Demo jugable del turno de noche: 3 pisos con reglas propias, propinas, apagones y despidos cómicos |
 | 💻 **CÓDIGO** | Referencia técnica en Luau: arquitectura cliente/servidor, sistema de gráficos y patrón de generación procedural |
 
 ## 🧩 Los tres conceptos
