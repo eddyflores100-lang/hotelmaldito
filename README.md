@@ -19,28 +19,30 @@
 
 ---
 
-## 🎮 DEMO JUGABLE 3D — Turno de noche en el Hotel ∞
+## 🎮 JUEGO JUGABLE 3D — HOTEL ∞: NOCHE INFINITA (action-survival)
 
-El loop central del juego ya se puede jugar **en 3D dentro del propio sitio**: pulsa **▶ JUGAR** en la navegación (o «Jugar la demo 3D» en el hero) y coge el turno de noche como botones del hotel.
+**El juego ya se juega dentro del sitio.** Pulsa **▶ JUGAR** (es la vista principal) y sobrevive la noche como botones del Hotel ∞: explora habitaciones, saquea monedas, **construye defensas** y aguanta **3 oleadas de anomalías** por noche. Al superar cada piso, elige 1 de 3 mejoras roguelite y sube al siguiente piso — **los pisos nunca terminan**.
 
 | | |
 |---|---|
-| ![Demo 3D del Hotel ∞ Infinito](docs/screenshots/game-3d.jpg) | ![Demo en móvil](docs/screenshots/game-mobile.jpg) |
-| *Recepción del P-13 — avatar estilo Roblox, cámara en 3ª persona* | *Joystick táctil y botones en móvil* |
-| ![Ficha de registro](docs/screenshots/game-card.jpg) | | 
-| *Ficha de registro: ¿huésped normal o anomalía?* | |
+| ![Noche en el pasillo](docs/screenshots/game-noche.jpg) | ![Mejoras roguelite](docs/screenshots/game-mejoras.jpg) |
+| *Oleada nocturna en el P-13 — pasillo, puertas y anomalías* | *Al superar un piso: elige 1 de 3 mejoras* |
+| ![Día: exploración](docs/screenshots/game-dia.jpg) | ![Móvil](docs/screenshots/game-mobile.jpg) |
+| *Fase de día: saquea y construye* | *Joystick + botones táctiles en móvil* |
 
-**Cómo se juega:**
+**El loop completo (60–90 s por piso):**
 
-- 🕐 **Sobrevive de 12:00 AM a 6:00 AM** atendiendo la recepción de cada piso.
-- 🚶 **Acércate a los huéspedes** que llegan de la entrada y pulsa `E` para revisar su ficha.
-- ✅ **Da la entrada** a los huéspedes normales: dejan propina en R$.
-- 🚨 **Denuncia anomalías**: ojos rojos, cuerpo gris, piernas imposibles, flotación, cara vacía, sin sombra — o fichas falsificadas (color distinto, habitación `P-∞`, llegada a las 04:44).
-- ❤️ **Tres errores y estás despedido.** Cada noche superada baja el ascensor a un peor: P-13, P-∞, P--1 y pisos que no aparecen en ningún plano.
+1. 🏗️ **FASE DE DÍA (45 s)** — explora las 8 habitaciones del piso, rompe candados con la **llave-tarjeta**, saquea monedas/botiquines/cofres y **construye defensas**: barricadas de maletas (25 🪙), torretas automáticas (60 🪙) y estaciones de curación (40 🪙).
+2. 🌙 **NOCHE — 3 OLEADAS** — las anomalías emergen del ascensor y de las habitaciones sin explorar: **Sombra** (tanque lento), **Maleta** (veloz), **Altísimo** (largo alcance), **Fantasma** (atraviesa muros y barricadas) y cada 3 pisos… **EL GERENTE** (jefe que destroza puertas y barricadas).
+3. ⚔️ **COMBATE** — golpe de escoba con arco y knockback (`clic`/`J`), dash con invulnerabilidad (`Shift`), combos ×8 que multiplican puntos, torretas que cubren tus espaldas.
+4. 📋 **MISIONES DINÁMICAS** — 2 misiones activas por piso (explora, saquea, construye, derrota) con recompensas en monedas.
+5. 🎴 **MEJORAS ROGUELITE** — al llegar las 6:00 AM: +daño, +vida, torretas pro, imán de monedas, botas de bruma… elige tu build y sube de piso.
 
-**Bajo el capó:** motor propio sobre [Three.js](https://threejs.org/) (~2.000 líneas de TypeScript en `src/game/`), avatares R6 estilo Roblox con animación procedural, hotel con iluminación dinámica y sombras, cámara en 3ª persona con raycast anti-muros, audio sintetizado con WebAudio (sin assets), temas de piso procedurales infinitos y controles táctiles (joystick + botones) además de WASD/espacio/E.
+**Controles:** `WASD` mover · ratón cámara · `clic`/`J` golpear · `Shift` dash · `Espacio` saltar · `E` puertas/cofres/ascensor · `1·2·3` construir · `Q` cancelar · `P` pausa. **Móvil:** joystick + botones + barra de construcción.
 
-> La demo demuestra el loop descrito en el GDD. El juego completo vive en Roblox Studio — el código Luau de referencia está en la vista CÓDIGO.
+**Bajo el capó:** motor propio sobre [Three.js](https://threejs.org/) (~3.400 líneas de TypeScript en `src/game/`): generador procedural de pisos con habitaciones reales (`world.ts`), 5 enemigos con IA de navegación por zonas y rutas por puertas (`enemy.ts`), construcciones colocables con validación de rejilla (`builds.ts`), director de oleadas con jefes, sistema de misiones por eventos (`missions.ts`), mejoras roguelite, cámara 3ª persona con raycast anti-muros, partículas, daño flotante, screen-shake, iluminación día/noche dinámica, audio 100% sintetizado con WebAudio (sin assets) y récord guardado en `localStorage`.
+
+> La demo demuestra el loop de acción descrito en el GDD. El juego completo vive en Roblox Studio — el código Luau de referencia está en la vista CÓDIGO.
 
 ## 📖 Sobre el proyecto
 
