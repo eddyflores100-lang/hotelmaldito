@@ -167,6 +167,9 @@ function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void })
           <span className="font-display text-sm tracking-wide text-paper">
             GAME<span className="text-amber">LAB</span>
           </span>
+          <span className="hidden border-l border-line pl-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-fog md:block">
+            by <span className="text-lime">AliceLabs</span>
+          </span>
         </button>
         <nav className="hidden items-center gap-6 lg:flex">
           {links.map(([n, label, href]) => (
@@ -847,17 +850,36 @@ function Verdict({
 function Footer() {
   return (
     <footer className="border-t border-line bg-deep/80">
-      <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 px-4 py-10 md:flex-row md:items-center md:px-8">
-        <div className="flex items-center gap-2.5">
-          <IconCube className="h-5 w-5 text-cyan" />
-          <span className="font-display text-xs text-paper">
-            GAME<span className="text-amber">LAB</span>
-          </span>
-          <span className="ml-3 text-xs text-fog">Doc de conceptos · v2.6 · 2026</span>
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-10 md:px-8">
+        <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <IconCube className="h-5 w-5 text-cyan" />
+            <span className="font-display text-xs text-paper">
+              GAME<span className="text-amber">LAB</span>
+            </span>
+            <span className="border-l border-line pl-2.5 text-[10px] font-bold uppercase tracking-[0.2em] text-fog">
+              by <span className="text-lime">AliceLabs</span>
+            </span>
+            <span className="ml-2 text-xs text-fog">v1.0 · 2026</span>
+          </div>
+          <a
+            href="LICENSE.txt"
+            target="_blank"
+            rel="noreferrer"
+            className="group flex items-center gap-2 border border-lime/50 px-3.5 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-lime transition-all duration-200 hover:-translate-y-0.5 hover:bg-lime hover:text-deep hover:shadow-[0_0_24px_rgba(168,230,60,0.25)]"
+          >
+            <IconCheck className="h-3 w-3" />
+            Licencia AliceLabs v1.0
+          </a>
         </div>
-        <p className="max-w-md text-xs leading-relaxed text-fog">
-          Documento conceptual no oficial, sin afiliación con Roblox Corporation.
-          Cifras de mercado de reportes públicos (2025). Precios en Robux orientativos.
+        <p className="max-w-3xl text-xs leading-relaxed text-fog">
+          © 2026 AliceLabs — GameLab Studio. Todo el contenido (GDD, plan de obra, código Luau y
+          pipeline gráfico) se publica bajo la{" "}
+          <a href="LICENSE.txt" target="_blank" rel="noreferrer" className="text-lime underline-offset-2 hover:underline">
+            Licencia AliceLabs v1.0
+          </a>
+          . Documento conceptual no oficial, sin afiliación con Roblox Corporation. Cifras de
+          mercado de reportes públicos (2025). Precios en Robux orientativos.
         </p>
       </div>
     </footer>
