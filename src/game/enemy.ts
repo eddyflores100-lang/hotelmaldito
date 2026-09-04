@@ -92,7 +92,9 @@ export class Enemy {
   private hpSprite: THREE.Sprite;
   private hpCanvas: HTMLCanvasElement;
   private hpTex: THREE.CanvasTexture;
-  private mats: THREE.MeshStandardMaterial[] = [];
+  private allMats: THREE.Material[] = [];              // opacidad fantasma (incluye básicos)
+  private stdMats: THREE.MeshStandardMaterial[] = [];  // SOLO estándar: flash/élite seguros
+  private baseEmissive: { color: THREE.Color; intensity: number }[] = [];
   private flashT = 0;
   private lastPush = new THREE.Vector3();
   private floatT = rnd(0, 6.28);
@@ -147,20 +149,36 @@ export class Enemy {
               std.opacity = 0.62;
               std.depthWrite = false;
             }
-            this.mats.push(std);
+            this.allMats.push(std);
+            // CRÍTICO: solo los materiales ESTÁNDAR pueden recibir .emissive.
+            // Asignárselo a un MeshBasicMaterial (p.ej. el contorno negro
+            // COMPARTIDO entre avatares) desincroniza su shader y tumba el
+            // render de toda la escena ("pantalla gris" al golpear monstruos).
+            if (std.isMeshStandardMaterial) {
+              this.stdMats.push(std);
+            }
           }
         }
       });
     };
     collectMats(type === "fantasma");
 
-    // élite: tinte dorado
+    // los enemigos NO proyectan sombras: alivia el pase de sombras de la escena
+    // (con 15+ enemigos dinámicos era el principal cuello de GPU al empezar la noche)
+    this.group.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) m.castShadow = false;
+    });
+
+    // élite: tinte dorado (solo en materiales estándar)
     if (elite) {
-      for (const m of this.mats) {
-        m.emissive = new THREE.Color("#c9861a");
+      for (const m of this.stdMats) {
+        m.emissive.set("#c9861a");
         m.emissiveIntensity = 0.42;
       }
     }
+    // snapshot del emissive original: el flash de daño lo restaura exacto
+    this.baseEmissive = this.stdMats.map((m) => ({ color: m.emissive.clone(), intensity: m.emissiveIntensity }));
 
     // barra de vida
     this.hpCanvas = document.createElement("canvas");
@@ -200,9 +218,9 @@ export class Enemy {
     this.hp -= dmg * armor;
     this.drawHp();
     this.flashT = 0.12;
-    for (const m of this.mats) {
-      m.emissive = new THREE.Color(this.elite ? "#ffd24a" : "#ff2418");
-      m.emissiveIntensity = 0.9;
+    for (let i = 0; i < this.stdMats.length; i++) {
+      this.stdMats[i].emissive.set(this.elite ? "#ffd24a" : "#ff2418");
+      this.stdMats[i].emissiveIntensity = 0.9;
     }
     const dir = new THREE.Vector3(this.group.position.x - from.x, 0, this.group.position.z - from.z).normalize();
     const power = this.type === "gerente" ? 0.6 : this.type === "golem" ? 0.9 : this.type === "altisimo" ? 2.2 : 3.4;
@@ -230,13 +248,17 @@ export class Enemy {
   update(dt: number, w: EnemyWorld): void {
     const p = this.group.position;
 
+    // barra de vida solo cerca del jugador (menos sprites transparentes por frame)
+    this.hpSprite.visible = this.state !== "die" && Math.hypot(w.playerPos.x - p.x, w.playerPos.z - p.z) < 16;
+
     // flash de daño
     if (this.flashT > 0) {
       this.flashT -= dt;
       if (this.flashT <= 0) {
-        for (const m of this.mats) {
-          m.emissiveIntensity = this.elite ? 0.42 : this.type === "maleta" || this.type === "gerente" || this.type === "golem" || this.type === "cucaracha" ? 0.5 : 0;
-          if (this.type === "fantasma") m.emissiveIntensity = 0.15;
+        // restaurar el emissive ORIGINAL (élite dorado incluido), no un valor por tipo
+        for (let i = 0; i < this.stdMats.length; i++) {
+          this.stdMats[i].emissive.copy(this.baseEmissive[i].color);
+          this.stdMats[i].emissiveIntensity = this.baseEmissive[i].intensity;
         }
       }
     }
@@ -257,7 +279,7 @@ export class Enemy {
       if (this.type === "fantasma") {
         p.y = 0.5;
         const fade = Math.min(0.62, this.t * 0.9);
-        for (const m of this.mats) m.opacity = fade;
+        for (const m of this.allMats) m.opacity = fade;
         if (this.t > 0.8) { this.state = "chase"; this.t = 0; }
       } else {
         p.y = -1.7 + Math.min(1.7, this.t * 2.4);

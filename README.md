@@ -21,7 +21,7 @@
 
 ## 🎮 JUEGO JUGABLE 3D — HOTEL ∞: GRAND HOTEL · NOCHE INFINITA (action-survival)
 
-**El juego ya se juega dentro del sitio.** Pulsa **▶ JUGAR** (es la vista principal). v4.1 lo pule todo: **nada de cubos crudos** — avatares con extremidades de cápsula y cabezas esféricas, mobiliario biselado y torneado (camas con cojines, sofás con apoyacodos, vasijas y lámparas de tornamesa, bañeras curvas, cofres de tapa abombada) — y un **arsenal de 6 herramientas recogibles** con estadísticas propias. El hotel sigue siendo GRAND: **lobby con fuente dorada, 3 alas, 12 habitaciones enormes (91 m²), salas especiales con tesoros, 9 clases de monstruos y 5 construcciones defensivas**. Sobrevive 3 oleadas por noche, elige mejoras roguelite y sube — **los pisos nunca terminan**.
+**El juego ya se juega dentro del sitio.** Pulsa **▶ JUGAR** (es la vista principal). v4.2 añade auto-ajuste de rendimiento y protección anti-bloqueo: **nada de cubos crudos** — avatares con extremidades de cápsula y cabezas esféricas, mobiliario biselado y torneado (camas con cojines, sofás con apoyacodos, vasijas y lámparas de tornamesa, bañeras curvas, cofres de tapa abombada) — y un **arsenal de 6 herramientas recogibles** con estadísticas propias. El hotel sigue siendo GRAND: **lobby con fuente dorada, 3 alas, 12 habitaciones enormes (91 m²), salas especiales con tesoros, 9 clases de monstruos y 5 construcciones defensivas**. Sobrevive 3 oleadas por noche, elige mejoras roguelite y sube — **los pisos nunca terminan**.
 
 | | |
 |---|---|

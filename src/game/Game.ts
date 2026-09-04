@@ -193,6 +193,14 @@ export class Game {
   readonly audio = new GameAudio();
   private isTouch: boolean;
   private quality: "high" | "low";
+  // ---- estabilidad / auto-ajuste de rendimiento (anti "pantalla gris") ----
+  private perfTier = 0;        // 0 máxima calidad · 3 modo rendimiento
+  private fpsEma = 60;         // FPS con media móvil exponencial
+  private tierCd = 0;          // cooldown entre cambios de calidad
+  private renderError = false; // ya mostramos el aviso de error del motor
+  private prevPhase: GamePhase | null = null;
+  private contextLost = false;
+  private enemyWorld!: EnemyWorld;
   private cb: GameCallbacks;
 
   constructor(private canvas: HTMLCanvasElement, cb: GameCallbacks) {
@@ -207,6 +215,8 @@ export class Game {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.28;
+    canvas.addEventListener("webglcontextlost", this.onContextLost);
+    canvas.addEventListener("webglcontextrestored", this.onContextRestored);
 
     this.camera = new THREE.PerspectiveCamera(58, 1, 0.1, 130);
     this.scene.add(this.camera);
@@ -217,12 +227,14 @@ export class Game {
     this.moon.position.set(-9, 12, 7);
     this.moon.castShadow = true;
     this.moon.shadow.mapSize.set(this.quality === "high" ? 2048 : 1024, this.quality === "high" ? 2048 : 1024);
-    this.moon.shadow.camera.left = -36;
-    this.moon.shadow.camera.right = 36;
-    this.moon.shadow.camera.top = 36;
-    this.moon.shadow.camera.bottom = -36;
+    this.moon.shadow.camera.left = -26;
+    this.moon.shadow.camera.right = 26;
+    this.moon.shadow.camera.top = 26;
+    this.moon.shadow.camera.bottom = -26;
     this.moon.shadow.bias = -0.003;
+    this.moon.shadow.camera.updateProjectionMatrix();
     this.scene.add(this.moon);
+    this.scene.add(this.moon.target); // la sombra sigue al jugador (frustum pequeño = barato)
     const fill = new THREE.AmbientLight(new THREE.Color("#2e3d5e"), 0.8);
     this.scene.add(fill);
 
@@ -261,6 +273,24 @@ export class Game {
       this.scene.add(m);
       this.particles.push({ mesh: m, vel: new THREE.Vector3(), life: 0 });
     }
+
+    // mundo de enemigos: UN objeto reutilizado cada frame (cero basura por frame)
+    this.enemyWorld = {
+      playerPos: this.playerGroup.position,
+      playerAlive: true,
+      colliders: [],
+      zones: [],
+      obstacles: this.obstacles,
+      damagePlayer: (dmg, from) => this.damagePlayer(dmg, from),
+      damageObstacle: (o, dmg) => this.damageObstacle(o, dmg),
+      spawnEnemyProjectile: (from, dir, dmg) => {
+        const pr = makeProjectile(from, dir, dmg, true);
+        this.scene.add(pr.mesh);
+        this.projectiles.push(pr);
+        this.audio.throwSfx();
+      },
+      fx: (pos, color, n, speed) => this.spawnParticles(pos, color, n, speed),
+    };
 
     this.buildFloor(0);
     this.bindInput();
@@ -326,6 +356,10 @@ export class Game {
 
     this.theme = floorThemeFor(index);
     this.world = buildWorld(this.scene, this.theme, this.quality, index);
+    try {
+      // precompilar shaders durante el día: evita el tironazo al aparecer el primer monstruo
+      this.renderer.compile(this.scene, this.camera);
+    } catch { /* opcional */ }
 
     const s = this.world.playerStart;
     this.playerGroup.position.set(s.x, 0, s.z);
@@ -573,10 +607,20 @@ export class Game {
   }
 
   togglePause(): void {
-    if (this.phase === "day" || this.phase === "night") {
+    if (this.phase === "day" || this.phase === "night" || this.phase === "cleared") {
+      this.prevPhase = this.phase;
       this.phase = "paused";
     } else if (this.phase === "paused") {
-      this.phase = this.wave > 0 ? "night" : "day";
+      if (this.contextLost) {
+        this.cb.onToast("Recuperando gráficos… espera un momento", "info");
+        return;
+      }
+      const back = this.prevPhase ?? (this.wave > 0 ? "night" : "day");
+      this.prevPhase = null;
+      this.renderError = false;
+      if (back === "night") { this.phase = "night"; this.targetLightK = 0; }
+      else if (back === "cleared") { this.phase = "cleared"; this.targetLightK = 1; }
+      else { this.phase = "day"; this.targetLightK = 1; }
     }
     this.pushHud();
   }
@@ -733,7 +777,8 @@ export class Game {
 
   private spawnEnemy(): number {
     const alive = this.enemies.filter((e) => e.alive).length;
-    if (alive > 11 + this.floorIndex * 2) return 0;
+    const cap = this.enemyCap();
+    if (alive >= cap) return 0;
 
     let type: EnemyType = "sombra";
     const f = this.floorIndex;
@@ -747,14 +792,18 @@ export class Game {
     else if (roll < 0.93 && f >= 2) type = "golem";
 
     const elite = f >= 2 && Math.random() < Math.min(0.22, 0.07 + f * 0.025);
-    const pack = type === "cucaracha" ? 3 : 1;
 
     // emboscada: a veces sale de una habitación sin explorar
     const useAmbush = Math.random() < 0.3;
     const unexplored = this.world.rooms.filter((r) => !r.explored && !r.door.locked);
     const base = useAmbush && unexplored.length > 0
       ? unexplored[Math.floor(Math.random() * unexplored.length)].center.clone()
-      : this.world.spawnPoints[Math.floor(Math.random() * this.world.spawnPoints.length)].clone();
+      : this.world.spawnPoints.length > 0
+        ? this.world.spawnPoints[Math.floor(Math.random() * this.world.spawnPoints.length)].clone()
+        : this.playerGroup.position.clone().add(new THREE.Vector3(rnd(-7, 7), 0, rnd(-7, 7)));
+
+    // sin superar el tope de vivos (el pack de cucarachas tampoco)
+    const pack = Math.min(type === "cucaracha" ? 3 : 1, cap - alive);
 
     for (let i = 0; i < pack; i++) {
       const spawn = base.clone().add(new THREE.Vector3(rnd(-1.2, 1.2), 0, rnd(-1.2, 1.2)));
@@ -781,10 +830,9 @@ export class Game {
     // suelta monedas
     const n = e.type === "gerente" ? 10 : e.elite ? irnd(4, 6) : irnd(1, 3);
     for (let i = 0; i < n; i++) {
-      const coin = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.14, 0.14, 0.05, 10),
-        new THREE.MeshStandardMaterial({ color: "#f4c542", emissive: "#a97f10", emissiveIntensity: 0.6, metalness: 0.8, roughness: 0.25 })
-      );
+      sharedCoinGeo ??= new THREE.CylinderGeometry(0.14, 0.14, 0.05, 10);
+      sharedCoinMat ??= new THREE.MeshStandardMaterial({ color: "#f4c542", emissive: "#a97f10", emissiveIntensity: 0.6, metalness: 0.8, roughness: 0.25 });
+      const coin = new THREE.Mesh(sharedCoinGeo, sharedCoinMat);
       coin.rotation.x = Math.PI / 2;
       const g = new THREE.Group();
       g.add(coin);
@@ -1541,80 +1589,155 @@ export class Game {
   private loop = (): void => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
-    const dt = Math.min(this.clock.getDelta(), 0.05);
+    try {
+      const rawDt = this.clock.getDelta();
+      const dt = Math.min(rawDt, 0.05);
 
-    // iluminación día/noche
-    this.lightK = damp(this.lightK, this.targetLightK, 1.2, dt);
-    this.hemi.intensity = 1.05 + this.lightK * 0.85;
-    this.moon.intensity = 1.45 + this.lightK * 0.9;
-    this.moon.color.setHSL(0.6, 0.5, 0.55 + this.lightK * 0.1);
-    if (this.scene.fog instanceof THREE.Fog) {
-      this.scene.fog.near = 20 + this.lightK * 6;
-      this.scene.fog.far = 34 + this.lightK * 28;
-    }
-
-    if (this.fadeK > 0) this.fadeK = Math.max(0, this.fadeK - dt * 1.4);
-
-    if (this.phase === "intro") {
-      this.introT += dt;
-      const a = this.introT * 0.12 + Math.PI;
-      const r = 7; // órbita dentro del lobby (fuera chocaría con la fachada sur)
-      this.camera.position.set(Math.sin(a) * r, 4.0, Math.cos(a) * r);
-      this.camera.lookAt(0, 1.4, 0);
-      this.camPos.copy(this.camera.position);
-      this.player.update(dt, false, 0, false);
-    } else if (this.phase === "day" || this.phase === "night" || this.phase === "cleared") {
-      if (this.phase === "day") {
-        this.phaseT -= dt;
-        if (this.phaseT <= 0) this.startNight();
+      // iluminación día/noche
+      this.lightK = damp(this.lightK, this.targetLightK, 1.2, dt);
+      this.hemi.intensity = 1.05 + this.lightK * 0.85;
+      this.moon.intensity = 1.45 + this.lightK * 0.9;
+      this.moon.color.setHSL(0.6, 0.5, 0.55 + this.lightK * 0.1);
+      if (this.scene.fog instanceof THREE.Fog) {
+        this.scene.fog.near = 20 + this.lightK * 6;
+        this.scene.fog.far = 34 + this.lightK * 28;
       }
-      if (this.phase === "night") this.updateNight(dt);
 
-      this.updatePlayer(dt);
-      this.updateEnemies(dt);
-      this.updateBuilds(dt);
-      this.updateProjectiles(dt);
-      this.updateLoot(dt);
-      this.updateGhost();
-      this.updateInteract();
+      if (this.fadeK > 0) this.fadeK = Math.max(0, this.fadeK - dt * 1.4);
 
-      // combo
-      if (this.comboT > 0) {
-        this.comboT -= dt;
-        if (this.comboT <= 0) this.combo = 0;
+      if (this.phase === "intro") {
+        this.introT += dt;
+        const a = this.introT * 0.12 + Math.PI;
+        const r = 7; // órbita dentro del lobby (fuera chocaría con la fachada sur)
+        this.camera.position.set(Math.sin(a) * r, 4.0, Math.cos(a) * r);
+        this.camera.lookAt(0, 1.4, 0);
+        this.camPos.copy(this.camera.position);
+        this.player.update(dt, false, 0, false);
+      } else if (this.phase === "day" || this.phase === "night" || this.phase === "cleared") {
+        if (this.phase === "day") {
+          this.phaseT -= dt;
+          if (this.phaseT <= 0) this.startNight();
+        }
+        if (this.phase === "night") this.updateNight(dt);
+
+        this.updatePlayer(dt);
+        this.updateEnemies(dt);
+        this.updateBuilds(dt);
+        this.updateProjectiles(dt);
+        this.updateLoot(dt);
+        this.updateGhost();
+        this.updateInteract();
+
+        // combo
+        if (this.comboT > 0) {
+          this.comboT -= dt;
+          if (this.comboT <= 0) this.combo = 0;
+        }
+      } else if (this.phase === "over" || this.phase === "paused" || this.phase === "upgrade") {
+        this.updateCamera(dt);
+        this.player.update(dt, false, 0, false);
       }
-    } else if (this.phase === "over" || this.phase === "paused" || this.phase === "upgrade") {
-      this.updateCamera(dt);
-      this.player.update(dt, false, 0, false);
+
+      // la sombra direccional sigue al jugador: frustum pequeño = sombras nítidas y baratas
+      const pp = this.playerGroup.position;
+      this.moon.target.position.set(pp.x, 0, pp.z);
+      this.moon.position.set(pp.x - 9, 12, pp.z + 7);
+
+      this.updateParticles(dt);
+      this.updateFloaters(dt);
+      if (this.phase !== "intro") this.updateCamera(dt);
+
+      this.pushHudThrottled(dt);
+      this.renderer.render(this.scene, this.camera);
+      this.trackPerf(rawDt);
+    } catch (err) {
+      // jamás dejar morir el rAF en silencio (era la causa del bloqueo sin mensaje)
+      if (this.loopErrCount < 5) console.error("[hotel∞] error en el bucle:", err);
+      this.loopErrCount++;
+      this.emergencyPause();
     }
-
-    this.updateParticles(dt);
-    this.updateFloaters(dt);
-    if (this.phase !== "intro") this.updateCamera(dt);
-
-    this.pushHudThrottled(dt);
-    this.renderer.render(this.scene, this.camera);
   };
 
+  private loopErrCount = 0;
+
+  /* ------------------- estabilidad: GPU / contexto / errores ------------------- */
+
+  private onContextLost = (e: Event): void => {
+    e.preventDefault(); // permite que el navegador restaure el contexto
+    this.contextLost = true;
+    if (this.phase === "day" || this.phase === "night" || this.phase === "cleared") {
+      this.prevPhase = this.phase;
+      this.phase = "paused";
+      this.pushHud();
+    }
+    this.cb.onBanner("RECUPERANDO GRÁFICOS…", "La GPU se saturó: pausamos la partida para protegerla. Continúa en unos segundos");
+  };
+
+  private onContextRestored = (): void => {
+    this.contextLost = false;
+    this.tierCd = 2;
+    this.cb.onToast("Gráficos recuperados ✓ pulsa ▶ para seguir", "ok");
+  };
+
+  private emergencyPause(): void {
+    if (this.renderError) return;
+    this.renderError = true;
+    if (this.phase === "day" || this.phase === "night" || this.phase === "cleared") {
+      this.prevPhase = this.phase;
+      this.phase = "paused";
+      this.pushHud();
+    }
+    this.cb.onBanner("ERROR DEL MOTOR — PARTIDA PAUSADA", "Detuvimos una falla para proteger tu partida. Pulsa ▶ para reintentar o recarga la página");
+  }
+
+  /** media móvil de FPS + auto-ajuste de calidad antes de que la GPU se ahogue */
+  private trackPerf(rawDt: number): void {
+    if (rawDt > 0.0001 && rawDt < 1) this.fpsEma = this.fpsEma * 0.92 + (1 / rawDt) * 0.08;
+    this.tierCd -= rawDt;
+    if (this.tierCd > 0) return;
+    const playing = this.phase === "day" || this.phase === "night" || this.phase === "cleared";
+    if (playing && this.fpsEma < 23 && this.perfTier < 3) {
+      this.perfTier++;
+      this.applyPerfTier();
+      this.tierCd = 6;
+      this.cb.onToast(this.perfTier === 1 ? "Optimizando gráficos para ir fluido ⚙" : "Modo rendimiento activado ⚙", "info");
+    } else if (this.perfTier > 0 && this.fpsEma > 55 && !this.contextLost) {
+      this.perfTier--;
+      this.applyPerfTier();
+      this.tierCd = 14;
+    }
+  }
+
+  private applyPerfTier(): void {
+    const base = Math.min(window.devicePixelRatio || 1, this.quality === "high" ? 2 : 1.5);
+    const dpr = this.perfTier >= 3 ? 1 : this.perfTier === 2 ? Math.min(base, 1.25) : this.perfTier === 1 ? Math.min(base, 1.5) : base;
+    this.renderer.setPixelRatio(dpr);
+    if (this.perfTier >= 2) {
+      this.moon.castShadow = false; // apaga el pase completo de sombras: el mayor ahorro de GPU
+    } else {
+      this.moon.castShadow = true;
+      const size = this.perfTier === 0 ? (this.quality === "high" ? 2048 : 1024) : 1024;
+      if (this.moon.shadow.mapSize.x !== size) {
+        this.moon.shadow.mapSize.set(size, size);
+        this.moon.shadow.map?.dispose();
+        this.moon.shadow.map = null;
+      }
+    }
+    this.onResize();
+  }
+
+  /** tope de enemigos vivos: baja si el auto-ajuste detecta GPU justa */
+  private enemyCap(): number {
+    return Math.max(6, 11 + this.floorIndex * 2 - this.perfTier * 2);
+  }
+
   private updateEnemies(dt: number): void {
-    const w: EnemyWorld = {
-      playerPos: this.playerGroup.position,
-      playerAlive: this.phase !== "over",
-      colliders: this.world.colliders,
-      zones: this.world.zones,
-      obstacles: this.obstacles,
-      damagePlayer: (dmg, from) => this.damagePlayer(dmg, from),
-      damageObstacle: (o, dmg) => this.damageObstacle(o, dmg),
-      spawnEnemyProjectile: (from, dir, dmg) => {
-        const pr = makeProjectile(from, dir, dmg, true);
-        this.scene.add(pr.mesh);
-        this.projectiles.push(pr);
-        this.audio.throwSfx();
-      },
-      fx: (pos, color, n, speed) => this.spawnParticles(pos, color, n, speed),
-    };
+    const w = this.enemyWorld;
+    w.playerAlive = this.phase !== "over";
+    w.colliders = this.world.colliders;
+    w.zones = this.world.zones;
     // reconstruir obstáculos: puertas cerradas + barricadas
-    this.obstacles = [];
+    this.obstacles.length = 0;
     for (const r of this.world.rooms) {
       const d = r.door;
       if (!d.broken && d.open01 < 0.5) {
@@ -1710,6 +1833,8 @@ export class Game {
   dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
+    this.canvas.removeEventListener("webglcontextlost", this.onContextLost);
+    this.canvas.removeEventListener("webglcontextrestored", this.onContextRestored);
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
@@ -1727,6 +1852,10 @@ export class Game {
 }
 
 /* helpers locales */
+
+// geometría/material compartidos para las monedas que sueltan los enemigos
+let sharedCoinGeo: THREE.CylinderGeometry | null = null;
+let sharedCoinMat: THREE.MeshStandardMaterial | null = null;
 
 function pointInZoneRoom(r: { zone: { minX: number; maxX: number; minZ: number; maxZ: number } }, x: number, z: number): boolean {
   return x >= r.zone.minX && x <= r.zone.maxX && z >= r.zone.minZ && z <= r.zone.maxZ;

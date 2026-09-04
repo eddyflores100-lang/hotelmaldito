@@ -881,7 +881,7 @@ function Footer() {
               GAME<span className="text-amber">LAB</span>
               <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.28em] text-fog">by AliceLabs</span>
             </span>
-            <span className="ml-3 text-xs text-fog">v4.1 · 2026</span>
+            <span className="ml-3 text-xs text-fog">v4.2 · 2026</span>
           </div>
           <p className="mt-2.5 text-[11px] font-bold uppercase tracking-[0.2em] text-amber">
             © 2026 AliceLabs LLC · Licencia AliceLabs LLC · Todos los derechos reservados
