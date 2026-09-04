@@ -12,7 +12,11 @@ import {
 import GddView from "./components/Gdd";
 import RoadmapView from "./components/Roadmap";
 import CodebaseView from "./components/Codebase";
+import { lazy, Suspense } from "react";
 import DemoView from "./components/Game3D";
+
+const SpaceView = lazy(() => import("./components/GameSpace"));
+const AntView = lazy(() => import("./components/GameAnt"));
 import { useCountUp, useInView } from "./hooks";
 import {
   GameIcon,
@@ -131,7 +135,7 @@ function FloatingCubes() {
 
 /* ----------------------------------- top HUD --------------------------------- */
 
-type View = "lab" | "gdd" | "roadmap" | "demo" | "code";
+type View = "lab" | "gdd" | "roadmap" | "demo" | "code" | "space" | "ant";
 
 function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void }) {
   const linksByView: Record<View, [string, string, string][]> = {
@@ -162,6 +166,8 @@ function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void })
       ["JUGAR", "El turno", "#jugar-top"],
       ["JUGAR", "Reglas", "#reglas"],
     ],
+    space: [] as [string, string, string][],
+    ant: [] as [string, string, string][],
   };
   const links = linksByView[view];
   return (
@@ -210,7 +216,7 @@ function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void })
             </button>
             <button
               onClick={() => onSelect("roadmap")}
-              className={`font-display cursor-pointer border-l border-line px-3 py-1.5 text-[11px] tracking-wider transition-all duration-200 ${
+              className={`font-display hidden cursor-pointer border-l border-line px-3 py-1.5 text-[11px] tracking-wider transition-all duration-200 sm:block ${
                 view === "roadmap" ? "bg-lime text-deep" : "text-fog hover:text-paper"
               }`}
             >
@@ -222,11 +228,27 @@ function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void })
                 view === "demo" ? "bg-amber text-deep" : "text-fog hover:text-paper"
               }`}
             >
-              ▶ JUGAR
+              ▶ HOTEL
+            </button>
+            <button
+              onClick={() => onSelect("space")}
+              className={`font-display flex cursor-pointer items-center gap-1.5 border-l border-line px-3 py-1.5 text-[11px] tracking-wider transition-all duration-200 ${
+                view === "space" ? "bg-cyan text-deep" : "text-fog hover:text-paper"
+              }`}
+            >
+              ▶ ESPACIO
+            </button>
+            <button
+              onClick={() => onSelect("ant")}
+              className={`font-display flex cursor-pointer items-center gap-1.5 border-l border-line px-3 py-1.5 text-[11px] tracking-wider transition-all duration-200 ${
+                view === "ant" ? "bg-lime text-deep" : "text-fog hover:text-paper"
+              }`}
+            >
+              ▶ JARDÍN
             </button>
             <button
               onClick={() => onSelect("code")}
-              className={`font-display cursor-pointer border-l border-line px-3 py-1.5 text-[11px] tracking-wider transition-all duration-200 ${
+              className={`font-display hidden cursor-pointer border-l border-line px-3 py-1.5 text-[11px] tracking-wider transition-all duration-200 md:block ${
                 view === "code" ? "bg-cyan text-deep" : "text-fog hover:text-paper"
               }`}
             >
@@ -245,7 +267,7 @@ function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void })
 
 /* ---------------------------------- opening ---------------------------------- */
 
-function Opening({ onPlayDemo }: { onPlayDemo: () => void }) {
+function Opening({ onPlay }: { onPlay: (v: View) => void }) {
   return (
     <section id="top" className="relative flex min-h-screen flex-col overflow-hidden pt-14">
       <FloatingCubes />
@@ -264,35 +286,41 @@ function Opening({ onPlayDemo }: { onPlayDemo: () => void }) {
               <span className="block text-5xl text-paper sm:text-7xl xl:text-8xl">TRES JUEGOS</span>
             </Reveal>
             <Reveal delay={180}>
-              <span className="text-outline block text-5xl sm:text-7xl xl:text-8xl">QUE AÚN NO</span>
+              <span className="text-outline block text-5xl sm:text-7xl xl:text-8xl">TRES DEMOS</span>
             </Reveal>
             <Reveal delay={280}>
-              <span className="block text-5xl text-amber sm:text-7xl xl:text-8xl">EXISTEN</span>
+              <span className="block text-5xl text-amber sm:text-7xl xl:text-8xl">JUGABLES</span>
               <span className="blink ml-2 inline-block h-[0.85em] w-[0.45em] translate-y-[0.12em] bg-amber align-baseline" />
             </Reveal>
           </h1>
           <Reveal delay={380}>
             <p className="mt-7 max-w-xl text-base leading-relaxed text-fog md:text-lg">
               Mercado verificado, jugabilidad definida y escenarios dibujados. Tres conceptos
-              únicos pensados para jugadores de <span className="font-semibold text-paper">10 a 18 años</span> —
-              cada uno ataca un hueco distinto del catálogo de Roblox.
+              únicos para jugadores de <span className="font-semibold text-paper">10 a 18 años</span> —
+              y los tres ya tienen <span className="font-semibold text-paper">demo jugable 3D</span> aquí mismo, en el navegador.
             </p>
           </Reveal>
           <Reveal delay={480}>
             <div className="mt-9 flex flex-wrap items-center gap-4">
               <button
-                onClick={onPlayDemo}
-                className="font-display group inline-flex cursor-pointer items-center gap-3 border-2 border-amber bg-amber px-7 py-3.5 text-sm text-deep transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_32px_rgba(255,160,47,0.35)] active:translate-y-0"
+                onClick={() => onPlay("demo")}
+                className="font-display group inline-flex cursor-pointer items-center gap-3 border-2 border-amber bg-amber px-6 py-3.5 text-sm text-deep transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_32px_rgba(255,160,47,0.35)] active:translate-y-0"
               >
-                ▶ JUGAR LA DEMO 3D
+                ▶ HOTEL ∞ INFINITO
                 <IconArrow className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
               </button>
-              <a
-                href="#mercado"
-                className="font-display inline-flex items-center gap-3 border-2 border-line px-7 py-3.5 text-sm text-fog transition-all duration-200 hover:border-cyan hover:text-cyan"
+              <button
+                onClick={() => onPlay("space")}
+                className="font-display inline-flex cursor-pointer items-center gap-2 border-2 border-cyan px-5 py-3.5 text-sm text-cyan transition-all duration-200 hover:-translate-y-0.5 hover:bg-cyan/10"
               >
-                Ver el mercado
-              </a>
+                ▶ CHATARRA CÓSMICA
+              </button>
+              <button
+                onClick={() => onPlay("ant")}
+                className="font-display inline-flex cursor-pointer items-center gap-2 border-2 border-lime px-5 py-3.5 text-sm text-lime transition-all duration-200 hover:-translate-y-0.5 hover:bg-lime/10"
+              >
+                ▶ HORMIGUERO
+              </button>
             </div>
           </Reveal>
         </div>
@@ -476,7 +504,7 @@ const riskStyles: Record<string, string> = {
   Alto: "text-[#ff6b6b] border-[#ff6b6b]/50 bg-[#ff6b6b]/10",
 };
 
-function ConceptDetail({ game, onPlayDemo }: { game: GameConcept; onPlayDemo: () => void }) {
+function ConceptDetail({ game, onPlay }: { game: GameConcept; onPlay: (v: View) => void }) {
   return (
     <div key={game.id} className="panel-in space-y-10">
       {/* header */}
@@ -506,10 +534,28 @@ function ConceptDetail({ game, onPlayDemo }: { game: GameConcept; onPlayDemo: ()
         <p className="mt-4 max-w-3xl text-base leading-relaxed text-fog md:text-lg">{game.tagline}</p>
         {game.id === "hotel" && (
           <button
-            onClick={onPlayDemo}
+            onClick={() => onPlay("demo")}
             className="font-display mt-5 inline-flex cursor-pointer items-center gap-3 border-2 border-amber bg-amber px-6 py-3 text-xs text-deep transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_32px_rgba(255,160,47,0.35)] active:translate-y-0"
           >
             ▶ JUGAR LA DEMO 3D DEL TURNO DE NOCHE
+          </button>
+        )}
+        {game.id === "chatarra" && (
+          <button
+            onClick={() => onPlay("space")}
+            className="font-display mt-5 inline-flex cursor-pointer items-center gap-3 border-2 px-6 py-3 text-xs transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
+            style={{ borderColor: game.color, color: game.color, background: game.colorSoft }}
+          >
+            ▶ JUGAR LA DEMO ORBITAL EN 3D
+          </button>
+        )}
+        {game.id === "hormiguero" && (
+          <button
+            onClick={() => onPlay("ant")}
+            className="font-display mt-5 inline-flex cursor-pointer items-center gap-3 border-2 px-6 py-3 text-xs transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
+            style={{ borderColor: game.color, color: game.color, background: game.colorSoft }}
+          >
+            ▶ JUGAR LA DEMO DEL JARDÍN EN 3D
           </button>
         )}
       </div>
@@ -657,7 +703,7 @@ function ConceptDetail({ game, onPlayDemo }: { game: GameConcept; onPlayDemo: ()
   );
 }
 
-function Concepts({ onPlayDemo }: { onPlayDemo: () => void }) {
+function Concepts({ onPlay }: { onPlay: (v: View) => void }) {
   const [activeId, setActiveId] = useState(games[1].id);
   const active = games.find((g) => g.id === activeId) ?? games[0];
 
@@ -709,7 +755,7 @@ function Concepts({ onPlayDemo }: { onPlayDemo: () => void }) {
           </Reveal>
 
           {/* detail panel */}
-          <ConceptDetail game={active} onPlayDemo={onPlayDemo} />
+          <ConceptDetail game={active} onPlay={onPlay} />
         </div>
       </div>
     </section>
@@ -881,7 +927,7 @@ function Footer() {
               GAME<span className="text-amber">LAB</span>
               <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.28em] text-fog">by AliceLabs</span>
             </span>
-            <span className="ml-3 text-xs text-fog">v4.2 · 2026</span>
+            <span className="ml-3 text-xs text-fog">v5.0 · 3 demos jugables · 2026</span>
           </div>
           <p className="mt-2.5 text-[11px] font-bold uppercase tracking-[0.2em] text-amber">
             © 2026 AliceLabs LLC · Licencia AliceLabs LLC · Todos los derechos reservados
@@ -915,9 +961,9 @@ export default function App() {
       <main className="relative z-10">
         {view === "lab" ? (
           <>
-            <Opening onPlayDemo={() => switchView("demo")} />
+            <Opening onPlay={switchView} />
             <Market />
-            <Concepts onPlayDemo={() => switchView("demo")} />
+            <Concepts onPlay={switchView} />
             <Compare />
             <Verdict
               onOpenGdd={() => switchView("gdd")}
@@ -926,6 +972,14 @@ export default function App() {
           </>
         ) : view === "demo" ? (
           <DemoView />
+        ) : view === "space" ? (
+          <Suspense fallback={null}>
+            <SpaceView onExit={() => switchView("lab")} />
+          </Suspense>
+        ) : view === "ant" ? (
+          <Suspense fallback={null}>
+            <AntView onExit={() => switchView("lab")} />
+          </Suspense>
         ) : view === "gdd" ? (
           <GddView onBack={() => switchView("lab")} onOpenRoadmap={() => switchView("roadmap")} />
         ) : view === "roadmap" ? (

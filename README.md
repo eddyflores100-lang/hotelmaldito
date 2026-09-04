@@ -2,9 +2,9 @@
 
 # 🎮 GameLab by AliceLabs
 
-### Hotel ∞ Infinito — GDD completo + demo jugable 3D · Un proyecto de AliceLabs LLC
+### GameLab — 3 demos jugables 3D + GDD · Un proyecto de AliceLabs LLC
 
-*GameLab by AliceLabs: sitio interactivo de investigación y diseño — radiografía del mercado Roblox 2025, tres conceptos jugables en nichos vacíos, GDD completo del proyecto estrella, roadmap de producción y código Luau de referencia.*
+*GameLab by AliceLabs: laboratorio de juegos — **tres demos jugables 3D en tu navegador** (Hotel ∞ Infinito · Chatarra Cósmica · Hormiguero: Guerra del Jardín), radiografía del mercado Roblox 2025, GDD completo, roadmap de producción y código Luau de referencia.*
 
 [![CI](https://github.com/eddyflores100-lang/hotelmaldito/actions/workflows/ci.yml/badge.svg)](https://github.com/eddyflores100-lang/hotelmaldito/actions/workflows/ci.yml)
 [![Deploy Pages](https://github.com/eddyflores100-lang/hotelmaldito/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/eddyflores100-lang/hotelmaldito/actions/workflows/deploy-pages.yml)
@@ -13,7 +13,7 @@
 [![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
 [![License](https://img.shields.io/badge/Licencia-AliceLabs_LLC-C9A227)](LICENSE)
 
-**🌐 Ver demo en vivo → [eddyflores100-lang.github.io/hotelmaldito](https://eddyflores100-lang.github.io/hotelmaldito/)**
+**🌐 Jugar las 3 demos → [eddyflores100-lang.github.io/hotelmaldito](https://eddyflores100-lang.github.io/hotelmaldito/)**
 
 </div>
 
@@ -21,7 +21,7 @@
 
 ## 🎮 JUEGO JUGABLE 3D — HOTEL ∞: GRAND HOTEL · NOCHE INFINITA (action-survival)
 
-**El juego ya se juega dentro del sitio.** Pulsa **▶ JUGAR** (es la vista principal). v4.2 añade auto-ajuste de rendimiento y protección anti-bloqueo: **nada de cubos crudos** — avatares con extremidades de cápsula y cabezas esféricas, mobiliario biselado y torneado (camas con cojines, sofás con apoyacodos, vasijas y lámparas de tornamesa, bañeras curvas, cofres de tapa abombada) — y un **arsenal de 6 herramientas recogibles** con estadísticas propias. El hotel sigue siendo GRAND: **lobby con fuente dorada, 3 alas, 12 habitaciones enormes (91 m²), salas especiales con tesoros, 9 clases de monstruos y 5 construcciones defensivas**. Sobrevive 3 oleadas por noche, elige mejoras roguelite y sube — **los pisos nunca terminan**.
+**Los 3 conceptos ya se juegan dentro del sitio.** Pulsa **▶ HOTEL**, **▶ ESPACIO** o **▶ JARDÍN** en la barra superior. v5.0 añade **Chatarra Cósmica** y **Hormiguero: Guerra del Jardín** como demos completas. Hotel ∞ v4.2 añade auto-ajuste de rendimiento y protección anti-bloqueo: **nada de cubos crudos** — avatares con extremidades de cápsula y cabezas esféricas, mobiliario biselado y torneado (camas con cojines, sofás con apoyacodos, vasijas y lámparas de tornamesa, bañeras curvas, cofres de tapa abombada) — y un **arsenal de 6 herramientas recogibles** con estadísticas propias. El hotel sigue siendo GRAND: **lobby con fuente dorada, 3 alas, 12 habitaciones enormes (91 m²), salas especiales con tesoros, 9 clases de monstruos y 5 construcciones defensivas**. Sobrevive 3 oleadas por noche, elige mejoras roguelite y sube — **los pisos nunca terminan**.
 
 | | |
 |---|---|
@@ -71,7 +71,9 @@ El concepto ganador — **Hotel ∞ Infinito**, terror cómico cooperativo con p
 | 🔬 **LAB** | Radiografía del mercado con métricas animadas, 5 insights de diseño, 3 conceptos con loop y escenarios, tabla comparativa y veredicto razonado |
 | 🏨 **HOTEL ∞** | GDD completo: pilares, roles, economia de propinas, escenarios firma (Piscina Sin Fin, Piso Espejo, La Caldera), sistemas y UI |
 | 🗺️ **PLAN** | Roadmap de 12 semanas en 4 fases: prototipo vertical → generador procedural → beta cerrada → lanzamiento y live-ops |
-| 🎮 **JUGAR** | GRAND HOTEL jugable v4.1: hotel estilizado (cero cubos crudos), 6 herramientas recogibles, lobby + 3 alas + 12 habitaciones grandes, 4 salas especiales, Bóveda, 9 monstruos, 5 construcciones, oleadas, misiones, mejoras y pisos infinitos |
+| 🏨 **▶ HOTEL** | Terror cómico action-survival: hotel estilizado, 6 herramientas recogibles, lobby + 3 alas + 12 habitaciones, 4 salas especiales, Bóveda, 9 monstruos, 5 construcciones, oleadas, mejoras roguelite y pisos infinitos |
+| 🛰️ **▶ ESPACIO** | **CHATARRA CÓSMICA** — tycoon en gravedad cero: gancho magnético, remolca chatarra orbital hasta la fundidora, construye 6 tipos de módulos (oxígeno, energía, escudo, hangar con dron…) y sobrevive tormentas solares hasta la **Estación Leyenda** |
+| 🐜 **▶ JARDÍN** | **HORMIGUERO: GUERRA DEL JARDÍN** — estrategia de colonias: recolecta migas y rocío, excava 4 cámaras, cría obreras y soldados, ordeña áfidos, evoluciona tu casta y defiende a la Reina de oleadas de hormigas rojas, avispas y arañas (cuidado con la lluvia gigante) |
 | 💻 **CÓDIGO** | Referencia técnica en Luau: arquitectura cliente/servidor, sistema de gráficos y patrón de generación procedural |
 
 ## 🧩 Los tres conceptos

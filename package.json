@@ -1,7 +1,7 @@
 {
   "name": "gamelab-by-alicelabs",
-  "description": "GameLab by AliceLabs — 3 conceptos únicos de juego + GDD completo de Hotel ∞ Infinito con demo jugable 3D: análisis de mercado, diseño, roadmap y código Luau de referencia",
-  "version": "4.2.0",
+  "description": "GameLab by AliceLabs — 3 demos jugables 3D (Hotel ∞ Infinito · Chatarra Cósmica · Hormiguero: Guerra del Jardín) + GDD, análisis de mercado, roadmap y código Luau de referencia",
+  "version": "5.0.0",
   "private": true,
   "type": "module",
   "license": "UNLICENSED",
