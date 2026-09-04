@@ -14,7 +14,8 @@ import {
 } from "./builds";
 import { MissionBoard } from "./missions";
 import { GameAudio } from "./audio";
-import { clamp, damp, rnd, irnd } from "./util";
+import { TOOLS, makeToolMesh, makeToolPickupMesh, type ToolType } from "./tools";
+import { clamp, damp, rnd, irnd, disposeObject } from "./util";
 
 export type GamePhase = "intro" | "day" | "night" | "cleared" | "upgrade" | "over" | "paused";
 
@@ -48,6 +49,7 @@ export type HudState = {
   playerPt: { x: number; z: number; ang: number };
   enemyPts: { x: number; z: number; elite: boolean }[];
   chestPts: { x: number; z: number }[];
+  tool: { name: string; dmg: number; reach: number; color: string };
 };
 
 export type GameStats = {
@@ -111,6 +113,9 @@ export class Game {
   private reachMult = 1;
   private magnetMult = 1;
   private coinMult = 1;
+  private tool: ToolType = "escoba";
+  private toolMesh: THREE.Group | null = null;
+  private toolDrops: { type: ToolType; group: THREE.Group; spinner: THREE.Group; pos: THREE.Vector3; phase: number }[] = [];
   private dashCd = 0;
   private dashCdMax = 1.5;
   private dashing = 0;
@@ -232,7 +237,7 @@ export class Game {
       hatColor: "#1d3a6e",
     });
     this.playerGroup.add(this.player.group);
-    this.buildWeapon();
+    this.equipTool("escoba", true);
     this.scene.add(this.playerGroup);
 
     // fantasmas de construcción
@@ -248,8 +253,8 @@ export class Game {
       this.scene.add(this.ghosts[k]);
     }
 
-    // pools de efectos
-    const pGeo = new THREE.BoxGeometry(0.09, 0.09, 0.09);
+    // pool de partículas (octaedros, no cubos)
+    const pGeo = new THREE.OctahedronGeometry(0.075);
     for (let i = 0; i < 70; i++) {
       const m = new THREE.Mesh(pGeo, new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true }));
       m.visible = false;
@@ -267,29 +272,43 @@ export class Game {
     (window as unknown as { __hotelGame?: Game }).__hotelGame = this;
   }
 
-  /* ------------------------------ arma ------------------------------ */
+  /* --------------------------- herramienta --------------------------- */
 
-  private buildWeapon(): void {
-    const handle = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.035, 0.045, 1.5, 8),
-      new THREE.MeshStandardMaterial({ color: "#8a5a30", roughness: 0.7 })
-    );
-    handle.rotation.x = Math.PI / 2;
-    handle.position.set(0, 0, 0.75);
-    const brush = new THREE.Mesh(
-      new THREE.BoxGeometry(0.4, 0.22, 0.3),
-      new THREE.MeshStandardMaterial({ color: "#d9b04c", roughness: 0.9 })
-    );
-    brush.position.set(0, 0, 1.55);
-    const band = new THREE.Mesh(
-      new THREE.BoxGeometry(0.42, 0.24, 0.06),
-      new THREE.MeshStandardMaterial({ color: "#a8e63c", emissive: "#4a7a10", emissiveIntensity: 0.4 })
-    );
-    band.position.set(0, 0, 1.38);
-    this.weaponPivot.add(handle, brush, band);
-    this.weaponPivot.position.set(0.42, 1.05, 0.15);
-    this.weaponPivot.rotation.x = -0.35;
-    this.playerGroup.add(this.weaponPivot);
+  private equipTool(type: ToolType, silent = false): void {
+    this.tool = type;
+    if (this.toolMesh) {
+      this.weaponPivot.remove(this.toolMesh);
+      this.toolMesh.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.geometry) m.geometry.dispose();
+        if (!m.material) return;
+        const mats = Array.isArray(m.material) ? m.material : [m.material];
+        for (const mat of mats) mat?.dispose();
+      });
+    }
+    this.toolMesh = makeToolMesh(type);
+    this.weaponPivot.add(this.toolMesh);
+    if (this.weaponPivot.parent !== this.playerGroup) this.playerGroup.add(this.weaponPivot);
+    // pose de reposo: ligeramente abierta del cuerpo y con la punta visible
+    this.weaponPivot.position.set(0.52, 1.0, 0.05);
+    this.weaponPivot.rotation.set(-0.55, 0.14, -0.1);
+    if (!silent) {
+      const t = TOOLS[type];
+      this.audio.upgrade();
+      this.spawnParticles(this.playerGroup.position, t.glow, 10, 2.2);
+      this.spawnFloater(this.playerGroup.position, t.name, t.glow);
+      this.cb.onToast(`⚔ ${t.name} EQUIPADA · Daño ${t.dmg} · ${t.desc}`, "ok");
+      this.pushHud();
+    }
+  }
+
+  /** suelta una herramienta como botín brillante en el suelo */
+  private spawnToolDrop(type: ToolType, pos: THREE.Vector3): void {
+    const { group, spinner } = makeToolPickupMesh(type);
+    group.position.set(pos.x + rnd(-0.5, 0.5), 0, pos.z + rnd(-0.5, 0.5));
+    group.rotation.y = rnd(0, Math.PI * 2);
+    this.scene.add(group);
+    this.toolDrops.push({ type, group, spinner, pos: group.position.clone(), phase: rnd(0, 6.28) });
   }
 
   /* ------------------------------ piso ------------------------------ */
@@ -302,6 +321,8 @@ export class Game {
     this.builds = [];
     for (const p of this.projectiles) this.scene.remove(p.mesh);
     this.projectiles = [];
+    for (const t of this.toolDrops) { this.scene.remove(t.group); disposeObject(t.group); }
+    this.toolDrops = [];
 
     this.theme = floorThemeFor(index);
     this.world = buildWorld(this.scene, this.theme, this.quality, index);
@@ -389,6 +410,7 @@ export class Game {
       playerPt: { x: pp.x, z: pp.z, ang: this.facing },
       enemyPts: this.enemies.filter((e) => e.alive).map((e) => ({ x: e.pos.x, z: e.pos.z, elite: e.elite })),
       chestPts: this.world.rooms.filter((r) => r.chest && !r.chest.taken).map((r) => ({ x: r.chest!.pos.x, z: r.chest!.pos.z })),
+      tool: { name: TOOLS[this.tool].name, dmg: Math.round(TOOLS[this.tool].dmg * this.dmgMult), reach: Math.round(TOOLS[this.tool].reach * this.reachMult * 10) / 10, color: TOOLS[this.tool].glow },
     });
   }
 
@@ -485,14 +507,15 @@ export class Game {
 
   pressAttack(): void {
     if (this.swingCd > 0 || (this.phase !== "day" && this.phase !== "night")) return;
+    const tool = TOOLS[this.tool];
     this.swingT = 1;
-    this.swingCd = 0.42;
+    this.swingCd = tool.cd;
     this.audio.swing();
-    // golpe en arco
+    // golpe en arco (el arco depende de la herramienta)
     const p = this.playerGroup.position;
     const fx = Math.sin(this.facing);
     const fz = Math.cos(this.facing);
-    const reach = 2.15 * this.reachMult;
+    const reach = tool.reach * this.reachMult;
     let hitAny = false;
     for (const e of this.enemies) {
       if (!e.alive) continue;
@@ -501,10 +524,10 @@ export class Game {
       const d = Math.hypot(dx, dz);
       if (d > reach + e.stats.radius) continue;
       const dot = (dx * fx + dz * fz) / Math.max(0.001, d);
-      if (dot < 0.35) continue; // fuera del arco
-      const killed = e.takeHit(Math.round(19 * this.dmgMult), p);
+      if (dot < tool.arcDot) continue; // fuera del arco
+      const killed = e.takeHit(Math.round(tool.dmg * this.dmgMult), p);
       hitAny = true;
-      this.spawnParticles(e.pos, "#ff8a5e", 5, 2.2);
+      this.spawnParticles(e.pos, tool.color, 5, 2.2);
       if (killed) this.onEnemyKilled(e);
     }
     // objetos rompibles (jarrones, platos…)
@@ -617,11 +640,11 @@ export class Game {
 
   private offerUpgrades(): void {
     const pool: Upgrade[] = [
-      { id: "dmg", title: "ESCOPA AFILADA", desc: "+30% de daño con la escoba", icon: "sword", apply: () => { this.dmgMult += 0.3; } },
+      { id: "dmg", title: "HERRAMIENTA AFILADA", desc: "+30% de daño con tu herramienta", icon: "sword", apply: () => { this.dmgMult += 0.3; } },
       { id: "hp", title: "CORAZÓN EXTRA", desc: "+25 vida máxima y curación total", icon: "heart", apply: () => { this.maxHp += 25; this.hp = this.maxHp; } },
       { id: "speed", title: "ZAPATILLAS TURBO", desc: "+12% de velocidad de movimiento", icon: "zap", apply: () => { this.speedMult += 0.12; } },
       { id: "turret", title: "TORRETAS PRO", desc: "Torretas +50% de daño y cadencia", icon: "target", apply: () => { this.turretBoost *= 1.5; } },
-      { id: "reach", title: "ESCOBA GIGANTE", desc: "+35% de alcance de golpe", icon: "expand", apply: () => { this.reachMult += 0.35; } },
+      { id: "reach", title: "BRAZO LARGO", desc: "+35% de alcance de golpe", icon: "expand", apply: () => { this.reachMult += 0.35; } },
       { id: "armor", title: "UNIFORME ACORAZADO", desc: "-20% de daño recibido", icon: "shield", apply: () => { this.armor *= 0.8; } },
       { id: "magnet", title: "IMÁN DE PROPINAS", desc: "Radio de recogida ×2 y +25% monedas", icon: "magnet", apply: () => { this.magnetMult *= 2; this.coinMult += 0.25; } },
       { id: "dash", title: "BOTAS DE BRUMA", desc: "Dash con 35% menos de espera", icon: "wind", apply: () => { this.dashCdMax *= 0.65; } },
@@ -679,6 +702,7 @@ export class Game {
     this.floorIndex = 0;
     this.buildMode = null;
     for (const k of Object.keys(this.ghosts) as BuildKind[]) this.ghosts[k].visible = false;
+    this.equipTool("escoba", true);
     this.buildFloor(0);
     this.audio.init();
     this.audio.startAmbient();
@@ -780,6 +804,13 @@ export class Game {
       g.position.set(e.pos.x, 0.6, e.pos.z);
       this.scene.add(g);
       this.world.loot.push({ kind: "key", group: g, pos: g.position.clone(), taken: false, value: 1, phase: rnd(0, 6.28) });
+    }
+    // ¡los élites y el jefe sueltan herramientas!
+    const toolChance = e.type === "gerente" ? 1 : e.elite ? 0.16 : 0;
+    if (Math.random() < toolChance) {
+      const pool: ToolType[] = ["plumero", "sarten", "bate", "hacha", "varita"];
+      this.spawnToolDrop(pool[Math.floor(Math.random() * pool.length)], e.pos);
+      this.cb.onToast("La anomalía ha soltado una HERRAMIENTA — recógela", "info");
     }
   }
 
@@ -1209,11 +1240,11 @@ export class Game {
     if (this.swingT > 0) {
       this.swingT = Math.max(0, this.swingT - dt * 5.5);
       const phase = 1 - this.swingT;
-      this.weaponPivot.rotation.x = -0.35 - Math.sin(phase * Math.PI) * 1.5;
-      this.weaponPivot.rotation.y = Math.sin(phase * Math.PI) * 0.5;
+      this.weaponPivot.rotation.x = -0.55 - Math.sin(phase * Math.PI) * 1.6;
+      this.weaponPivot.rotation.y = 0.14 + Math.sin(phase * Math.PI) * 0.6;
     } else {
-      this.weaponPivot.rotation.x = damp(this.weaponPivot.rotation.x, -0.35, 10, dt);
-      this.weaponPivot.rotation.y = damp(this.weaponPivot.rotation.y, 0, 10, dt);
+      this.weaponPivot.rotation.x = damp(this.weaponPivot.rotation.x, -0.55, 10, dt);
+      this.weaponPivot.rotation.y = damp(this.weaponPivot.rotation.y, 0.14, 10, dt);
     }
 
     // parpadeo con iframes
@@ -1274,6 +1305,39 @@ export class Game {
         }
         loot.splice(i, 1);
         continue;
+      }
+    }
+
+    // ---------------- herramientas: equipar al pasar por encima ----------------
+    const tryTool = (t: { type: ToolType; pos: THREE.Vector3 }): boolean => {
+      const d = Math.hypot(p.x - t.pos.x, p.z - t.pos.z);
+      if (d >= 0.95) return false;
+      this.spawnParticles(t.pos, TOOLS[t.type].glow, 14, 2.6);
+      if (t.type === this.tool) {
+        // duplicada: se convierte en monedas
+        this.coins += 15;
+        this.coinsEarned += 15;
+        this.audio.coin();
+        this.spawnFloater(t.pos, "+15", "#f4c542");
+      } else {
+        this.equipTool(t.type);
+      }
+      return true;
+    };
+    for (let i = this.world.tools.length - 1; i >= 0; i--) {
+      const t = this.world.tools[i];
+      if (t.taken) { this.world.tools.splice(i, 1); continue; }
+      if (tryTool(t)) { t.taken = true; t.group.visible = false; this.world.tools.splice(i, 1); }
+    }
+    for (let i = this.toolDrops.length - 1; i >= 0; i--) {
+      const t = this.toolDrops[i];
+      t.phase += dt;
+      t.spinner.rotation.y += dt * 1.4;
+      t.spinner.position.y = Math.sin(t.phase * 2.1) * 0.07;
+      if (tryTool(t)) {
+        this.scene.remove(t.group);
+        disposeObject(t.group);
+        this.toolDrops.splice(i, 1);
       }
     }
 
@@ -1494,8 +1558,8 @@ export class Game {
     if (this.phase === "intro") {
       this.introT += dt;
       const a = this.introT * 0.12 + Math.PI;
-      const r = 11;
-      this.camera.position.set(Math.sin(a) * r, 4.6, Math.cos(a) * r);
+      const r = 7; // órbita dentro del lobby (fuera chocaría con la fachada sur)
+      this.camera.position.set(Math.sin(a) * r, 4.0, Math.cos(a) * r);
       this.camera.lookAt(0, 1.4, 0);
       this.camPos.copy(this.camera.position);
       this.player.update(dt, false, 0, false);

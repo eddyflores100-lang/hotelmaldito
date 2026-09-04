@@ -161,6 +161,12 @@ export default function Game3D() {
                   <div className="h-full rounded-full" style={{ width: `${Math.min(100, hud.dashReady * 100)}%`, background: HEX.cyan }} />
                 </div>
               </div>
+              {/* herramienta equipada */}
+              <div className="flex items-center gap-1.5 rounded-lg border bg-[#0f1b31]/80 px-2.5 py-1" style={{ borderColor: `${hud.tool.color}55` }}>
+                <Sword size={12} style={{ color: hud.tool.color }} />
+                <span className="font-display text-[10px] leading-none" style={{ color: hud.tool.color }}>{hud.tool.name}</span>
+                <span className="text-[9px] text-[#8fa4c2]">⚔{hud.tool.dmg} · ⇢{hud.tool.reach}</span>
+              </div>
               {/* misiones */}
               <div className="hidden sm:flex flex-col gap-1">
                 {hud.missions.map((m, i) => (

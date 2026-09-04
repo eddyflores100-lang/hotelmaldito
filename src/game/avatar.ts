@@ -1,9 +1,11 @@
 /* ============================================================
-   HOTEL ∞ INFINITO — Avatar estilo Roblox (R6) con
-   animación procedural de caminar / saltar / idle.
+   HOTEL ∞ INFINITO — Avatar estilizado (anti-bloques):
+   extremidades de CÁPSULA, torso BISELADO y cabeza ESFÉRICA
+   con cara tipo decal. Animación procedural caminar/saltar/idle.
    ============================================================ */
 import * as THREE from "three";
-import { STUD, faceTexture, type FaceVariant, rnd } from "./util";
+import { STUD, faceDecalTexture, type FaceVariant, rnd } from "./util";
+import { rbox } from "./shapes";
 
 export type HatType = "none" | "top" | "cap" | "party" | "crown" | "bellhop";
 
@@ -30,6 +32,7 @@ type Limb = { pivot: THREE.Group; mesh: THREE.Mesh };
 export class Avatar {
   readonly group = new THREE.Group();
   private head!: THREE.Mesh;
+  private decal!: THREE.Mesh;
   private torso!: THREE.Mesh;
   private arms: Limb[] = [];
   private legs: Limb[] = [];
@@ -37,82 +40,89 @@ export class Avatar {
   private bobT = 0;
   private jumpT = 0; // >0 mientras dura el salto
   private speedFactor = 0;
-  private mats: THREE.MeshStandardMaterial[] = [];
+  private mats: THREE.Material[] = [];
   readonly height: number;
 
   constructor(cfg: AvatarConfig) {
     const legLen = 2 * (cfg.tall ?? 1);
     this.height = (legLen + 2 + 1.2) * STUD;
 
-    const mkMat = (color: string) => {
-      const m = new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0.05 });
+    const mkMat = (color: string, rough = 0.72) => {
+      const m = new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0.04 });
       this.mats.push(m);
       return m;
     };
+    const shadow = (mesh: THREE.Mesh) => {
+      mesh.castShadow = !cfg.noShadow;
+      mesh.receiveShadow = true;
+    };
+
+    /** extremidad cápsula: pivote en la articulación superior, cuelga hacia abajo */
     const mkLimb = (
-      w: number, h: number, d: number, mat: THREE.Material,
-      px: number, py: number, pz: number, // posición del pivote
-      oy: number // offset del mesh respecto al pivote (cuelga)
+      radius: number, length: number, mat: THREE.Material,
+      px: number, py: number, pz: number
     ): Limb => {
       const pivot = new THREE.Group();
       pivot.position.set(px, py, pz);
-      const geo = new THREE.BoxGeometry(w * STUD, h * STUD, d * STUD);
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.y = oy;
-      mesh.castShadow = !cfg.noShadow;
-      mesh.receiveShadow = true;
+      const total = length + radius * 2;
+      const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(radius, length, 4, 12), mat);
+      mesh.position.y = -total / 2 + radius * 0.55; // hunde el hombro dentro del torso
+      shadow(mesh);
       pivot.add(mesh);
       this.group.add(pivot);
       return { pivot, mesh };
     };
 
-    const legMat = mkMat(cfg.legs);
+    const legMat = mkMat(cfg.legs, 0.85);
     const armMat = mkMat(cfg.arms);
     const torsoMat = mkMat(cfg.torso);
 
+    const s = STUD;
+    const limbR = 0.42 * s;
+
     // piernas: pivote en la cadera
-    const hipY = legLen * STUD;
+    const hipY = legLen * s;
+    const legCapsule = legLen * s - 0.24 * s; // sección recta
     this.legs = [
-      mkLimb(1, legLen, 1, legMat, -0.5 * STUD, hipY, 0, -legLen * STUD * 0.5),
-      mkLimb(1, legLen, 1, legMat, 0.5 * STUD, hipY, 0, -legLen * STUD * 0.5),
+      mkLimb(limbR, legCapsule, legMat, -0.5 * s, hipY, 0),
+      mkLimb(limbR, legCapsule, legMat, 0.5 * s, hipY, 0),
     ];
 
-    // torso (2×2×1 studs), centro en hipY + 1 stud
-    const torsoY = hipY + 1 * STUD;
-    this.torso = new THREE.Mesh(new THREE.BoxGeometry(2 * STUD, 2 * STUD, 1 * STUD), torsoMat);
+    // torso biselado (2×2×1 studs), centro en hipY + 1 stud
+    const torsoY = hipY + 1 * s;
+    this.torso = new THREE.Mesh(rbox(2 * s, 2 * s, 1.02 * s, 0.3 * s, 3), torsoMat);
     this.torso.position.y = torsoY;
-    this.torso.castShadow = !cfg.noShadow;
-    this.torso.receiveShadow = true;
+    shadow(this.torso);
     this.group.add(this.torso);
 
     // brazos: pivote en el hombro
-    const shoulderY = torsoY + 1 * STUD - 0.1 * STUD;
+    const shoulderY = torsoY + 0.82 * s;
     this.arms = [
-      mkLimb(1, 2, 1, armMat, -1.5 * STUD, shoulderY, 0, -1 * STUD - 0.1 * STUD),
-      mkLimb(1, 2, 1, armMat, 1.5 * STUD, shoulderY, 0, -1 * STUD - 0.1 * STUD),
+      mkLimb(limbR * 0.92, 2 * s - 0.34 * s, armMat, -1.18 * s, shoulderY, 0),
+      mkLimb(limbR * 0.92, 2 * s - 0.34 * s, armMat, 1.18 * s, shoulderY, 0),
     ];
 
-    // cabeza con cara (6 materiales, cara al frente −z; el avatar mira a +z → rotate)
-    const skinMat = mkMat(cfg.skin);
-    const faceMat = new THREE.MeshStandardMaterial({
-      map: faceTexture(cfg.face, cfg.skin),
-      roughness: 0.8,
-      emissive: cfg.glow ? new THREE.Color("#ff2418") : new THREE.Color("#000000"),
-      emissiveIntensity: cfg.glow ? 0.55 : 0,
-    });
-    this.mats.push(faceMat);
-    const headGeo = new THREE.BoxGeometry(1.2 * STUD, 1.2 * STUD, 1.2 * STUD);
-    // orden materiales: +x, −x, +y, −y, +z, −z → cara en +z (frente del avatar)
-    const headMats = [skinMat, skinMat, skinMat, skinMat, faceMat, skinMat];
-    this.head = new THREE.Mesh(headGeo, headMats);
-    this.head.position.y = torsoY + 1 * STUD + 0.6 * STUD;
-    this.head.castShadow = !cfg.noShadow;
+    // cabeza esférica + cara decal
+    const skinMat = mkMat(cfg.skin, 0.62);
+    const headR = 0.72 * s;
+    this.head = new THREE.Mesh(new THREE.SphereGeometry(headR, 22, 18), skinMat);
+    this.head.position.y = torsoY + 1 * s + headR * 0.82;
+    shadow(this.head);
     this.group.add(this.head);
 
-    this.buildHat(cfg, torsoY + 1 * STUD + 1.2 * STUD);
+    const decalMat = new THREE.MeshBasicMaterial({
+      map: faceDecalTexture(cfg.face),
+      transparent: true,
+    });
+    this.mats.push(decalMat);
+    this.decal = new THREE.Mesh(new THREE.PlaneGeometry(headR * 1.35, headR * 1.35), decalMat);
+    this.decal.position.set(0, this.head.position.y + headR * 0.06, headR * 1.005);
+    this.group.add(this.decal);
+
+    this.buildHat(cfg, this.head.position.y + headR * 0.94, headR);
   }
 
-  private buildHat(cfg: AvatarConfig, topY: number): void {
+  private buildHat(cfg: AvatarConfig, topY: number, headR: number): void {
     const color = cfg.hatColor ?? "#20242c";
     const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.35 });
     this.mats.push(mat);
@@ -123,56 +133,73 @@ export class Avatar {
     const s = STUD;
     switch (cfg.hat) {
       case "top": {
-        const brim = new THREE.Mesh(new THREE.CylinderGeometry(1.3 * s, 1.3 * s, 0.14 * s, 20), mat);
-        brim.position.y = topY + 0.07 * s;
+        const brim = new THREE.Mesh(new THREE.CylinderGeometry(headR * 0.92, headR * 0.98, 0.12 * s, 20), mat);
+        brim.position.y = topY;
         add(brim);
-        const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.85 * s, 0.85 * s, 1.1 * s, 20), mat);
-        tube.position.y = topY + 0.7 * s;
+        const tube = new THREE.Mesh(new THREE.CylinderGeometry(headR * 0.62, headR * 0.66, 1.0 * s, 20), mat);
+        tube.position.y = topY + 0.55 * s;
         add(tube);
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(headR * 0.67, headR * 0.67, 0.14 * s, 20),
+          new THREE.MeshStandardMaterial({ color: "#8a2a2a", roughness: 0.5 }));
+        band.position.y = topY + 0.22 * s;
+        this.mats.push(band.material as THREE.Material);
+        add(band);
         break;
       }
       case "cap": {
-        const dome = new THREE.Mesh(new THREE.SphereGeometry(0.78 * s, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat);
-        dome.position.y = topY;
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(headR * 0.92, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat);
+        dome.position.y = topY - headR * 0.1;
         add(dome);
-        const brim = new THREE.Mesh(new THREE.BoxGeometry(1.3 * s, 0.1 * s, 0.9 * s), mat);
-        brim.position.set(0, topY + 0.02 * s, 0.75 * s);
+        const brim = new THREE.Mesh(rbox(1.35 * s, 0.09 * s, 0.95 * s, 0.04 * s), mat);
+        brim.position.set(0, topY - headR * 0.08, headR * 0.85);
         add(brim);
         break;
       }
       case "party": {
-        const cone = new THREE.Mesh(new THREE.ConeGeometry(0.62 * s, 1.3 * s, 16), mat);
-        cone.position.y = topY + 0.6 * s;
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(0.58 * s, 1.25 * s, 16), mat);
+        cone.position.y = topY + 0.55 * s;
         add(cone);
+        const pompom = new THREE.Mesh(new THREE.SphereGeometry(0.14 * s, 10, 8),
+          new THREE.MeshStandardMaterial({ color: "#ff7ab8", roughness: 0.6 }));
+        pompom.position.y = topY + 1.2 * s;
+        this.mats.push(pompom.material as THREE.Material);
+        add(pompom);
         break;
       }
       case "crown": {
-        const band = new THREE.Mesh(new THREE.CylinderGeometry(0.8 * s, 0.8 * s, 0.4 * s, 16), mat);
-        band.position.y = topY + 0.2 * s;
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(headR * 0.72, headR * 0.78, 0.36 * s, 16), mat);
+        band.position.y = topY + 0.14 * s;
         add(band);
         for (let i = 0; i < 5; i++) {
           const a = (i / 5) * Math.PI * 2;
-          const spike = new THREE.Mesh(new THREE.ConeGeometry(0.16 * s, 0.45 * s, 8), mat);
-          spike.position.set(Math.cos(a) * 0.62 * s, topY + 0.55 * s, Math.sin(a) * 0.62 * s);
+          const spike = new THREE.Mesh(new THREE.ConeGeometry(0.15 * s, 0.42 * s, 8), mat);
+          spike.position.set(Math.cos(a) * headR * 0.66, topY + 0.5 * s, Math.sin(a) * headR * 0.66);
           add(spike);
         }
+        const jewel = new THREE.Mesh(new THREE.OctahedronGeometry(0.11 * s),
+          new THREE.MeshStandardMaterial({ color: "#ff4a6e", emissive: "#ff2450", emissiveIntensity: 1.2, roughness: 0.2 }));
+        jewel.position.set(0, topY + 0.16 * s, headR * 0.78);
+        this.mats.push(jewel.material as THREE.Material);
+        add(jewel);
         break;
       }
       case "bellhop": {
-        // gorra de botones: banda + visera + hebilla dorada
-        const band = new THREE.Mesh(new THREE.CylinderGeometry(0.82 * s, 0.86 * s, 0.42 * s, 18), mat);
-        band.position.y = topY + 0.18 * s;
+        // gorra de botones: cúpula + banda + visera + hebilla dorada
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(headR * 0.95, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2.6), mat);
+        dome.position.y = topY - headR * 0.42;
+        dome.scale.y = 0.9;
+        add(dome);
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(headR * 0.98, headR * 1.0, 0.3 * s, 20), mat);
+        band.position.y = topY - headR * 0.36;
         add(band);
-        const top = new THREE.Mesh(new THREE.CylinderGeometry(0.86 * s, 0.86 * s, 0.1 * s, 18), mat);
-        top.position.y = topY + 0.44 * s;
-        add(top);
-        const brim = new THREE.Mesh(new THREE.BoxGeometry(1.5 * s, 0.08 * s, 0.85 * s), mat);
-        brim.position.set(0, topY - 0.02 * s, 0.85 * s);
+        const brim = new THREE.Mesh(rbox(1.55 * s, 0.08 * s, 0.95 * s, 0.04 * s), mat);
+        brim.position.set(0, topY - headR * 0.42, headR * 0.78);
         add(brim);
         const gold = new THREE.MeshStandardMaterial({ color: "#e9b23c", roughness: 0.3, metalness: 0.8 });
         this.mats.push(gold);
-        const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.34 * s, 0.22 * s, 0.05 * s), gold);
-        buckle.position.set(0, topY + 0.2 * s, 0.87 * s);
+        const buckle = new THREE.Mesh(new THREE.CylinderGeometry(0.15 * s, 0.15 * s, 0.05 * s, 12), gold);
+        buckle.rotation.x = Math.PI / 2;
+        buckle.position.set(0, topY - headR * 0.3, headR * 0.99);
         add(buckle);
         break;
       }
@@ -218,10 +245,12 @@ export class Avatar {
       this.arms[1].pivot.rotation.x = -2.4 * j + this.arms[1].pivot.rotation.x * (1 - j);
     }
 
-    this.torso.position.y += 0; // noop para claridad
-    const base = (this.legs[0].pivot.position.y);
+    const base = this.legs[0].pivot.position.y;
     this.torso.position.y = base + 1 * STUD + idleBob;
-    this.head.position.y = base + 1 * STUD + 1.6 * STUD + idleBob;
+    const headY = base + 1 * STUD + 1.6 * STUD + idleBob;
+    const headDelta = headY - this.head.position.y;
+    this.head.position.y += headDelta;
+    this.decal.position.y += headDelta;
     this.head.rotation.z = Math.sin(this.bobT * 1.3) * 0.02;
   }
 

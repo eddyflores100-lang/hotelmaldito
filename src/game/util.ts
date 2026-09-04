@@ -109,6 +109,82 @@ export function faceTexture(variant: FaceVariant, skin: string): THREE.CanvasTex
   return tex;
 }
 
+/** Cara como decal transparente (para cabezas esféricas). */
+export function faceDecalTexture(variant: FaceVariant): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  const g = c.getContext("2d")!;
+  g.clearRect(0, 0, 256, 256);
+  g.lineCap = "round";
+
+  const eye = (x: number, y: number, w: number, h: number, color: string) => {
+    g.fillStyle = color;
+    g.beginPath();
+    g.ellipse(x, y, w, h, 0, 0, Math.PI * 2);
+    g.fill();
+  };
+  const dark = variant === "red" || variant === "empty" ? "#101014" : "#161616";
+
+  if (variant === "red") {
+    eye(88, 112, 26, 30, "#0a0a0a");
+    eye(168, 112, 26, 30, "#0a0a0a");
+    eye(88, 112, 11, 13, "#ff2418");
+    eye(168, 112, 11, 13, "#ff2418");
+    g.strokeStyle = "#1a0505";
+    g.lineWidth = 8;
+    g.beginPath();
+    g.arc(128, 186, 38, Math.PI * 1.15, Math.PI * 1.85);
+    g.stroke();
+  } else if (variant === "empty") {
+    g.strokeStyle = "#0c0c10";
+    g.lineWidth = 7;
+    g.beginPath();
+    g.moveTo(70, 112); g.lineTo(106, 112);
+    g.moveTo(150, 112); g.lineTo(186, 112);
+    g.stroke();
+    g.beginPath();
+    g.moveTo(100, 188); g.lineTo(156, 188);
+    g.stroke();
+  } else if (variant === "happy") {
+    eye(94, 110, 11, 16, dark);
+    eye(162, 110, 11, 16, dark);
+    g.strokeStyle = dark;
+    g.lineWidth = 9;
+    g.beginPath();
+    g.arc(128, 150, 42, Math.PI * 0.15, Math.PI * 0.85);
+    g.stroke();
+  } else if (variant === "worried") {
+    eye(94, 114, 12, 15, dark);
+    eye(162, 114, 12, 15, dark);
+    g.strokeStyle = dark;
+    g.lineWidth = 8;
+    g.beginPath();
+    g.arc(128, 214, 34, Math.PI * 1.2, Math.PI * 1.8);
+    g.stroke();
+    g.beginPath();
+    g.moveTo(76, 92); g.lineTo(108, 100);
+    g.moveTo(180, 92); g.lineTo(148, 100);
+    g.stroke();
+  } else {
+    // angry
+    eye(94, 116, 12, 12, dark);
+    eye(162, 116, 12, 12, dark);
+    g.strokeStyle = dark;
+    g.lineWidth = 9;
+    g.beginPath();
+    g.moveTo(74, 90); g.lineTo(110, 104);
+    g.moveTo(182, 90); g.lineTo(146, 104);
+    g.stroke();
+    g.beginPath();
+    g.arc(128, 226, 30, Math.PI * 1.25, Math.PI * 1.75);
+    g.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
 /* --------------------------- mármol (suelo) --------------------------- */
 
 export function marbleTexture(): THREE.CanvasTexture {

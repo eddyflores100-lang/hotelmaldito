@@ -122,6 +122,19 @@ export class Enemy {
     this.group.scale.setScalar(this.stats.scale);
     this.group.position.copy(spawn);
 
+    // la cucaracha se aplasta y le salen antenas (menos humanoide)
+    if (type === "cucaracha") {
+      this.avatar.group.scale.y = 0.6;
+      const antMat = new THREE.MeshStandardMaterial({ color: "#241507", roughness: 0.8 });
+      for (const sd of [-1, 1]) {
+        const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.022, 0.6, 5), antMat);
+        ant.position.set(0.15 * sd, 1.55, 0.22);
+        ant.rotation.x = -0.75;
+        ant.rotation.z = 0.4 * sd;
+        this.avatar.group.add(ant);
+      }
+    }
+
     const collectMats = (ghost: boolean) => {
       this.group.traverse((o) => {
         const m = o as THREE.Mesh;

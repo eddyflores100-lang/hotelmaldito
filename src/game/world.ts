@@ -11,6 +11,8 @@ import {
   parquetTexture, tileTexture, goldMaterial, gemMaterial,
   disposeObject, damp, rnd, irnd,
 } from "./util";
+import { rbox, lathe, std } from "./shapes";
+import { makeToolPickupMesh, TOOL_ORDER, type ToolType } from "./tools";
 
 export type AABB = { minX: number; maxX: number; minZ: number; maxZ: number };
 export type Bounds = { minX: number; maxX: number; minZ: number; maxZ: number };
@@ -41,6 +43,15 @@ export type Breakable = {
   value: number;
   phase: number;
   radius: number;
+};
+
+export type ToolPickup = {
+  type: ToolType;
+  group: THREE.Group;
+  spinner: THREE.Group;
+  pos: THREE.Vector3;
+  taken: boolean;
+  phase: number;
 };
 
 export type DoorInfo = {
@@ -97,6 +108,7 @@ export type WorldRefs = {
   corridor: Zone;
   loot: LootItem[];
   breakables: Breakable[];
+  tools: ToolPickup[];
   elevatorPos: THREE.Vector3;
   playerStart: THREE.Vector3;
   spawnPoints: THREE.Vector3[];
@@ -257,15 +269,23 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
   const addPlant = (x: number, z: number): void => {
     const potMat = new THREE.MeshStandardMaterial({ color: "#6e3b22", roughness: 0.8 });
     const leafMat = new THREE.MeshStandardMaterial({ color: "#1e5c33", roughness: 0.9 });
+    const leafMat2 = new THREE.MeshStandardMaterial({ color: "#2a7a44", roughness: 0.9 });
     const g = new THREE.Group();
     g.position.set(x, 0, z);
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.26, 0.6, 12), potMat);
-    pot.position.y = 0.3;
+    const pot = new THREE.Mesh(
+      lathe([[0.02, 0], [0.4, 0], [0.46, 0.18], [0.34, 0.56], [0.38, 0.62], [0.42, 0.66], [0.4, 0.7], [0.36, 0.7]], 0.78, 14),
+      potMat
+    );
+    pot.position.y = 0;
     pot.castShadow = true;
     g.add(pot);
-    for (let l = 0; l < 5; l++) {
-      const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.3 - l * 0.035, 10, 8), leafMat);
-      leaf.position.set(rnd(-0.14, 0.14), 0.78 + l * 0.24, rnd(-0.14, 0.14));
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.55, 8), new THREE.MeshStandardMaterial({ color: "#4a2f18", roughness: 0.9 }));
+    trunk.position.y = 0.95;
+    g.add(trunk);
+    for (let l = 0; l < 6; l++) {
+      const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.3 - l * 0.03, 10, 8), l % 2 ? leafMat : leafMat2);
+      leaf.position.set(rnd(-0.16, 0.16), 1.18 + l * 0.2, rnd(-0.16, 0.16));
+      leaf.scale.set(1, 0.82, 1);
       leaf.castShadow = true;
       g.add(leaf);
     }
@@ -285,6 +305,7 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
   addWall("x", -8.2, 2.3, 8.4);
   addWall("x", 8.2, -8.4, -2.3);
   addWall("x", 8.2, 2.3, 8.4);
+  addWall("x", 8.2, -2.3, 2.3);   // cierre sur del lobby (tapaba la cámara)
 
   // alfombra grande del lobby
   const hubCarpet = new THREE.Mesh(
@@ -295,26 +316,36 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
   hubCarpet.receiveShadow = true;
   group.add(hubCarpet);
 
-  // fuente central
+  // fuente central (vasija torneada + agua + orbe)
   {
     const stone = new THREE.MeshStandardMaterial({ color: "#3a4356", roughness: 0.55, metalness: 0.15 });
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.95, 0.55, 20), stone);
-    base.position.set(0, 0.27, 0);
-    base.castShadow = true;
-    base.receiveShadow = true;
-    group.add(base);
-    const water = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.5, 1.5, 0.08, 20),
-      new THREE.MeshStandardMaterial({ color: theme.accent, emissive: accent, emissiveIntensity: 0.8, roughness: 0.15, metalness: 0.4 })
+    const basin = new THREE.Mesh(
+      lathe([[0.02, 0], [1.6, 0], [1.85, 0.12], [1.92, 0.42], [1.78, 0.52], [1.66, 0.5], [1.6, 0.34], [0.35, 0.3], [0.3, 0]], 0.62, 24),
+      stone
     );
-    water.position.set(0, 0.52, 0);
+    basin.position.set(0, 0, 0);
+    basin.castShadow = true;
+    basin.receiveShadow = true;
+    group.add(basin);
+    const lip = new THREE.Mesh(new THREE.TorusGeometry(1.86, 0.075, 10, 28), stone);
+    lip.rotation.x = Math.PI / 2;
+    lip.position.y = 0.63;
+    group.add(lip);
+    const water = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.52, 1.45, 0.09, 24),
+      new THREE.MeshStandardMaterial({ color: theme.accent, emissive: accent, emissiveIntensity: 0.8, roughness: 0.12, metalness: 0.45 })
+    );
+    water.position.set(0, 0.36, 0);
     group.add(water);
-    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 1.1, 12), stone);
-    pillar.position.set(0, 1.0, 0);
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.28, 1.0, 12), stone);
+    pillar.position.set(0, 0.85, 0);
     pillar.castShadow = true;
     group.add(pillar);
-    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 12), goldMaterial());
-    orb.position.set(0, 1.68, 0);
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.34, 0.16, 16), stone);
+    bowl.position.set(0, 1.32, 0);
+    group.add(bowl);
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 14), goldMaterial());
+    orb.position.set(0, 1.72, 0);
     group.add(orb);
     colliders.push({ minX: -2.0, maxX: 2.0, minZ: -2.0, maxZ: 2.0 });
   }
@@ -359,26 +390,43 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
     addPainting(-1.6, 3.4, -7.85, 0, floorIndex + 3, true);
   }
 
-  // sofás y mesita
+  // sofás y mesita (cojines biselados + apoyacodos cápsula)
   const sofa = (x: number, z: number, ry: number) => {
     const g = new THREE.Group();
     g.position.set(x, 0, z);
     g.rotation.y = ry;
     const c = fabricMat("#5a2230");
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.5, 0.95), c);
-    seat.position.y = 0.28;
+    const cushion = fabricMat("#743044");
+    const seat = new THREE.Mesh(rbox(2.4, 0.42, 0.95, 0.1, 3), c);
+    seat.position.y = 0.26;
     seat.castShadow = true;
     g.add(seat);
-    const back = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.85, 0.25), c);
-    back.position.set(0, 0.75, -0.38);
+    const back = new THREE.Mesh(rbox(2.4, 0.8, 0.26, 0.12, 3), c);
+    back.position.set(0, 0.72, -0.37);
+    back.rotation.x = -0.1;
     back.castShadow = true;
     g.add(back);
-    const armL = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.6, 0.95), c);
-    armL.position.set(-1.08, 0.5, 0);
-    g.add(armL);
-    const armR = armL.clone();
-    armR.position.x = 1.08;
-    g.add(armR);
+    for (const side of [-1.08, 1.08]) {
+      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.62, 4, 10), c);
+      arm.rotation.z = Math.PI / 2;
+      arm.position.set(side, 0.55, 0.02);
+      arm.castShadow = true;
+      g.add(arm);
+    }
+    for (const cx of [-0.57, 0.57]) {
+      const cush = new THREE.Mesh(rbox(1.06, 0.15, 0.78, 0.07, 2), cushion);
+      cush.position.set(cx, 0.54, 0.03);
+      cush.castShadow = true;
+      g.add(cush);
+    }
+    // patas
+    for (const px of [-1.0, 1.0]) {
+      for (const pz of [-0.32, 0.32]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.035, 0.16, 8), trimMat);
+        leg.position.set(px, 0.07, pz);
+        g.add(leg);
+      }
+    }
     group.add(g);
     colliders.push({ minX: x - 1.3, maxX: x + 1.3, minZ: z - 0.62, maxZ: z + 0.62 });
   };
@@ -413,7 +461,7 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
   addPlant(-6.9, 6.9);
   addPlant(6.9, 6.9);
   addPlant(6.9, -6.9);
-  addPainting(0, 3.0, 8.05, Math.PI, floorIndex * 2 + 1, true);
+  addPainting(0, 3.0, 7.97, Math.PI, floorIndex * 2 + 1, true);
   addPainting(-7.95, 3.0, 5.4, Math.PI / 2, floorIndex * 2 + 4);
   addPainting(7.95, 3.0, 5.4, -Math.PI / 2, floorIndex * 2 + 6);
 
@@ -605,17 +653,24 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
 
   const addVase = (x: number, z: number, onY = 0): Breakable => {
     const g = new THREE.Group();
+    const clayMat = new THREE.MeshStandardMaterial({ color: "#b8874f", roughness: 0.32, metalness: 0.25 });
     const body = new THREE.Mesh(
-      new THREE.SphereGeometry(0.2, 12, 10),
-      new THREE.MeshStandardMaterial({ color: "#b8874f", roughness: 0.35, metalness: 0.25 })
+      lathe([[0.02, 0], [0.24, 0.04], [0.34, 0.32], [0.3, 0.62], [0.16, 0.85], [0.12, 0.95], [0.15, 1.05], [0.13, 1.1]], 0.5, 14),
+      clayMat
     );
-    body.scale.y = 1.25;
-    body.position.y = 0.22;
+    body.position.y = 0;
     body.castShadow = true;
     g.add(body);
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.13, 0.22, 10), body.material as THREE.Material);
-    neck.position.y = 0.52;
-    g.add(neck);
+    const bandMat = new THREE.MeshStandardMaterial({ color: "#e9b23c", metalness: 0.7, roughness: 0.35 });
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.145, 0.014, 6, 14), bandMat);
+    band.rotation.x = Math.PI / 2;
+    band.position.y = 0.42;
+    g.add(band);
+    // ramita seca
+    const twig = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.012, 0.3, 5), new THREE.MeshStandardMaterial({ color: "#5a4028", roughness: 0.9 }));
+    twig.position.set(0.02, 0.62, 0);
+    twig.rotation.z = 0.25;
+    g.add(twig);
     g.position.set(x, onY, z);
     group.add(g);
     const b: Breakable = { group: g, pos: g.position.clone(), broken: false, value: irnd(6, 14), phase: rnd(0, 6.28), radius: 0.42 };
@@ -640,15 +695,17 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
     const g = new THREE.Group();
     g.position.set(x, 0, z);
     const w = king ? 2.2 : 1.6;
-    const base = new THREE.Mesh(new THREE.BoxGeometry(w, 0.42, 2.5), woodMat);
-    base.position.y = 0.21;
+    const base = new THREE.Mesh(rbox(w, 0.42, 2.5, 0.1, 3), woodMat);
+    base.position.y = 0.22;
     base.castShadow = true;
     g.add(base);
-    const mattress = new THREE.Mesh(new THREE.BoxGeometry(w - 0.1, 0.3, 2.35), fabricMat("#d8d2c2"));
-    mattress.position.y = 0.55;
+    const mattress = new THREE.Mesh(rbox(w - 0.12, 0.32, 2.35, 0.13, 3), fabricMat("#d8d2c2"));
+    mattress.position.y = 0.56;
     g.add(mattress);
-    const pillow = new THREE.Mesh(new THREE.BoxGeometry(w - 0.5, 0.18, 0.55), fabricMat("#f0ece0"));
-    pillow.position.set(0, 0.74, facing * -0.78);
+    // almohadas almohadadas (biseles altos = forma de cojín)
+    const pillow = new THREE.Mesh(rbox(w - 0.55, 0.2, 0.56, 0.09, 3), fabricMat("#f0ece0"));
+    pillow.position.set(0, 0.78, facing * -0.78);
+    pillow.rotation.x = facing * -0.06;
     g.add(pillow);
     if (king) {
       const p2 = pillow.clone();
@@ -656,18 +713,25 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
       pillow.position.x = -0.55;
       g.add(p2);
     }
-    const blanket = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, 1.45), fabricMat(theme.accent));
-    blanket.position.set(0, 0.72, facing * 0.45);
+    // manta con doble pliegue
+    const blanket = new THREE.Mesh(rbox(w, 0.1, 1.45, 0.05, 2), fabricMat(theme.accent));
+    blanket.position.set(0, 0.74, facing * 0.45);
     g.add(blanket);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, 1.1, 0.16), woodMat);
-    head.position.set(0, 0.85, facing * -1.28);
+    const fold = new THREE.Mesh(rbox(w - 0.14, 0.055, 0.3, 0.025, 2), fabricMat(theme.wall));
+    fold.position.set(0, 0.8, facing * -0.14);
+    g.add(fold);
+    const head = new THREE.Mesh(rbox(w + 0.2, 1.15, 0.16, 0.07, 3), woodMat);
+    head.position.set(0, 0.88, facing * -1.28);
     head.castShadow = true;
     g.add(head);
     if (king) {
       for (const px of [-1, 1]) {
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 2.1, 8), woodMat);
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 2.1, 10), woodMat);
         post.position.set(px * (w / 2 + 0.05), 1.05, facing * -1.25);
         g.add(post);
+        const finial = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), goldMaterial());
+        finial.position.set(px * (w / 2 + 0.05), 2.13, facing * -1.25);
+        g.add(finial);
       }
     }
     g.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
@@ -676,15 +740,37 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
   };
 
   const addNightstand = (x: number, z: number, withLamp = true): void => {
-    addBox(0.66, 0.6, 0.66, x, 0.3, z, woodMat, true);
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+    const body = new THREE.Mesh(rbox(0.68, 0.6, 0.68, 0.07, 2), woodMat);
+    body.position.y = 0.3;
+    body.castShadow = true;
+    g.add(body);
+    const drawer = new THREE.Mesh(rbox(0.52, 0.16, 0.03, 0.02, 2), trimMat);
+    drawer.position.set(0, 0.38, 0.35);
+    g.add(drawer);
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.032, 8, 6), brassMat);
+    knob.position.set(0, 0.38, 0.38);
+    g.add(knob);
+    group.add(g);
+    colliders.push({ minX: x - 0.36, maxX: x + 0.36, minZ: z - 0.36, maxZ: z + 0.36 });
     if (withLamp) {
-      addBox(0.09, 0.26, 0.09, x, 0.73, z, brassMat);
-      const shade = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.24, 10, 1, true), fabricMat("#e8c890"));
-      shade.position.set(x, 0.98, z);
-      group.add(shade);
-      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), bulbMat);
-      bulb.position.set(x, 0.95, z);
-      group.add(bulb);
+      const lampG = new THREE.Group();
+      lampG.position.set(x, 0.6, z);
+      const foot = new THREE.Mesh(
+        lathe([[0.02, 0], [0.14, 0], [0.1, 0.06], [0.035, 0.2], [0.03, 0.26]], 0.28, 12), brassMat
+      );
+      lampG.add(foot);
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), bulbMat);
+      bulb.position.y = 0.36;
+      lampG.add(bulb);
+      const shade = new THREE.Mesh(
+        lathe([[0.09, 0], [0.2, 0.5], [0.24, 1]], 0.3, 14),
+        new THREE.MeshStandardMaterial({ color: "#e8c890", roughness: 0.8, emissive: "#e8b06a", emissiveIntensity: 0.35, side: THREE.DoubleSide })
+      );
+      shade.position.y = 0.32;
+      lampG.add(shade);
+      group.add(lampG);
     }
   };
 
@@ -692,17 +778,24 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
     const g = new THREE.Group();
     g.position.set(x, 0, z);
     g.rotation.y = ry;
-    const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 2.6, 0.72), woodMat);
+    const body = new THREE.Mesh(rbox(1.9, 2.6, 0.72, 0.1, 3), woodMat);
     body.position.y = 1.3;
     body.castShadow = true;
     body.receiveShadow = true;
     g.add(body);
-    const seam = new THREE.Mesh(new THREE.BoxGeometry(0.03, 2.2, 0.74), trimMat);
-    seam.position.y = 1.2;
+    const seam = new THREE.Mesh(rbox(0.03, 2.2, 0.05, 0.01, 1), trimMat);
+    seam.position.set(0, 1.2, 0.37);
     g.add(seam);
+    // moldura superior + zócalo
+    const crown = new THREE.Mesh(rbox(2.02, 0.14, 0.84, 0.04, 2), trimMat);
+    crown.position.y = 2.62;
+    g.add(crown);
+    const plinth = new THREE.Mesh(rbox(1.96, 0.16, 0.78, 0.03, 2), trimMat);
+    plinth.position.y = 0.08;
+    g.add(plinth);
     for (const px of [-0.22, 0.22]) {
-      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), brassMat);
-      knob.position.set(px, 1.25, 0.38);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), brassMat);
+      knob.position.set(px, 1.25, 0.39);
       g.add(knob);
     }
     group.add(g);
@@ -713,20 +806,28 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
     const g = new THREE.Group();
     g.position.set(x, 0, z);
     g.rotation.y = ry;
-    const d = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.72, 0.55), woodMat);
+    const d = new THREE.Mesh(rbox(1.7, 0.72, 0.55, 0.08, 3), woodMat);
     d.position.y = 0.36;
     d.castShadow = true;
     g.add(d);
+    for (const px of [-0.42, 0.42]) {
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), brassMat);
+      knob.position.set(px, 0.42, 0.29);
+      g.add(knob);
+    }
     const tv = new THREE.Mesh(
-      new THREE.BoxGeometry(1.3, 0.78, 0.08),
+      rbox(1.3, 0.78, 0.09, 0.035, 2),
       new THREE.MeshStandardMaterial({ color: "#0a0d14", roughness: 0.3, emissive: "#16283f", emissiveIntensity: 0.55 })
     );
     tv.position.set(0, 1.15, -0.05);
     tv.castShadow = true;
     g.add(tv);
-    const stand = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.2), trimMat);
-    stand.position.set(0, 0.78, 0);
+    const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.09, 0.18, 10), trimMat);
+    stand.position.set(0, 0.81, -0.05);
     g.add(stand);
+    const foot = new THREE.Mesh(rbox(0.5, 0.04, 0.24, 0.015, 2), trimMat);
+    foot.position.set(0, 0.74, -0.05);
+    g.add(foot);
     group.add(g);
     colliders.push({ minX: x - 0.9, maxX: x + 0.9, minZ: z - 0.45, maxZ: z + 0.45 });
   };
@@ -740,14 +841,20 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
 
   const addCrateStack = (x: number, z: number): void => {
     const crateMat = new THREE.MeshStandardMaterial({ color: "#7a5a34", roughness: 0.85 });
+    const bandMat = new THREE.MeshStandardMaterial({ color: "#4a3320", roughness: 0.8 });
     const n = irnd(2, 3);
     for (let i = 0; i < n; i++) {
       const s = rnd(0.55, 0.8);
-      const c = new THREE.Mesh(new THREE.BoxGeometry(s, s * 0.8, s), crateMat);
+      const c = new THREE.Mesh(rbox(s, s * 0.8, s, 0.05, 2), crateMat);
       c.position.set(x + rnd(-0.2, 0.2), s * 0.4 + i * s * 0.8, z + rnd(-0.2, 0.2));
       c.rotation.y = rnd(-0.4, 0.4);
       c.castShadow = true;
       c.receiveShadow = true;
+      const band = new THREE.Mesh(new THREE.TorusGeometry(s * 0.52, 0.018, 6, 4), bandMat);
+      band.rotation.x = Math.PI / 2;
+      band.rotation.z = Math.PI / 4;
+      band.position.y = -s * 0.05;
+      c.add(band);
       group.add(c);
     }
     colliders.push({ minX: x - 0.5, maxX: x + 0.5, minZ: z - 0.5, maxZ: z + 0.5 });
@@ -914,15 +1021,31 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
       tile.receiveShadow = true;
       group.add(tile);
       const tubMat = new THREE.MeshStandardMaterial({ color: "#e8ecee", roughness: 0.25 });
-      const tub = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.78, 1.3), tubMat);
-      tub.position.set(cx - 1.5, 0.39, cz + sz * 3.1);
+      // bañera con paredes curvas: cápsula aplastada + borde torneado
+      const tub = new THREE.Mesh(new THREE.CapsuleGeometry(0.62, 1.3, 6, 18), tubMat);
+      tub.rotation.x = Math.PI / 2;
+      tub.scale.set(1.02, 1, 0.58);
+      tub.position.set(cx - 1.5, 0.42, cz + sz * 3.1);
       tub.castShadow = true;
       group.add(tub);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.055, 10, 24), tubMat);
+      rim.rotation.x = Math.PI / 2;
+      rim.scale.set(1.02, 2.05, 1);
+      rim.position.set(cx - 1.5, 0.74, cz + sz * 3.1);
+      group.add(rim);
+      const faucet = new THREE.Mesh(
+        lathe([[0.03, 0], [0.05, 0.4], [0.035, 0.8], [0.035, 1]], 0.42, 10),
+        new THREE.MeshStandardMaterial({ color: "#c9ccd4", metalness: 0.85, roughness: 0.25 })
+      );
+      faucet.position.set(cx - 2.5, 0.76, cz + sz * 3.1);
+      group.add(faucet);
       const water = new THREE.Mesh(
-        new THREE.BoxGeometry(2.2, 0.06, 1.05),
+        new THREE.CapsuleGeometry(0.52, 1.15, 4, 16),
         new THREE.MeshStandardMaterial({ color: theme.accent, emissive: accent, emissiveIntensity: 0.7, roughness: 0.1 })
       );
-      water.position.set(cx - 1.5, 0.72, cz + sz * 3.1);
+      water.rotation.x = Math.PI / 2;
+      water.scale.set(0.94, 1, 0.05);
+      water.position.set(cx - 1.5, 0.66, cz + sz * 3.1);
       group.add(water);
       colliders.push({ minX: cx - 2.8, maxX: cx - 0.2, minZ: cz + sz * 2.4, maxZ: cz + sz * 3.8 });
       for (const sx of [2.3, 3.7]) {
@@ -984,14 +1107,29 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
         addBox(1.0, 0.22, 1.0, px, H - 0.1, pz, brassMat);
         colliders.push({ minX: px - 0.48, maxX: px + 0.48, minZ: pz - 0.48, maxZ: pz + 0.48 });
       }
-      // piano de cola
+      // piano de cola (cuerpo curvo simplificado con tapa alzada)
       const blackMat = new THREE.MeshStandardMaterial({ color: "#101014", roughness: 0.2, metalness: 0.4 });
-      addBox(2.3, 1.05, 1.15, cx + 0.7, 0.55, cz - 3.7, blackMat, true);
-      const lid = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.06, 1.05), blackMat);
+      const pianoBody = new THREE.Mesh(rbox(2.3, 1.0, 1.15, 0.12, 3), blackMat);
+      pianoBody.position.set(cx + 0.7, 0.55, cz - 3.7);
+      pianoBody.castShadow = true;
+      group.add(pianoBody);
+      const keys = new THREE.Mesh(rbox(1.9, 0.08, 0.34, 0.02, 2), std("#e8e4da", 0.4));
+      keys.position.set(cx + 0.7, 0.86, cz - 3.05);
+      group.add(keys);
+      for (let k = 0; k < 7; k++) {
+        const bk = new THREE.Mesh(rbox(0.09, 0.06, 0.16, 0.012, 1), blackMat);
+        bk.position.set(cx - 0.05 + k * 0.25, 0.93, cz - 3.12);
+        group.add(bk);
+      }
+      const lid = new THREE.Mesh(rbox(2.2, 0.06, 1.05, 0.03, 2), blackMat);
       lid.position.set(cx + 0.7, 1.16, cz - 3.85);
       lid.rotation.x = -0.42;
       lid.castShadow = true;
       group.add(lid);
+      const prop = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.62, 6), blackMat);
+      prop.position.set(cx + 1.55, 1.32, cz - 3.5);
+      prop.rotation.z = 0.5;
+      group.add(prop);
       for (const lx of [cx - 0.3, cx + 1.7]) {
         for (const lz of [cz - 3.2, cz - 4.2]) {
           const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.62, 8), blackMat);
@@ -1000,6 +1138,9 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
         }
       }
       addBox(0.9, 0.45, 0.4, cx + 2.4, 0.23, cz - 2.9, blackMat, true);            // banqueta
+      const benchTop = new THREE.Mesh(rbox(0.95, 0.08, 0.46, 0.03, 2), std("#7a1f2e", 0.8));
+      benchTop.position.set(cx + 2.4, 0.49, cz - 2.9);
+      group.add(benchTop);
       sofa(cx - 1.9, cz + 2.6, Math.PI);
       sofa(cx + 1.9, cz + 2.6, Math.PI);
       addBox(1.3, 0.42, 0.8, cx, 0.21, cz + 3.4, woodMat, true);
@@ -1154,6 +1295,28 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
     }
   }
 
+  /* ------------------- herramientas recogibles ------------------- */
+  const tools: ToolPickup[] = [];
+  {
+    // 3 herramientas por piso en salas distintas (siempre incluye una potente)
+    const pool: ToolType[] = [...TOOL_ORDER].filter((t) => t !== "escoba").sort(() => Math.random() - 0.5);
+    const chosen = pool.slice(0, 3);
+    if (!chosen.includes("hacha") && Math.random() < 0.4) chosen[2] = "hacha";
+    const candidates = rooms.filter((r) => !r.door.locked);
+    const sorted = [...candidates].sort((a, b) => Math.hypot(b.center.x, b.center.z) - Math.hypot(a.center.x, a.center.z));
+    const spots = sorted.slice(0, Math.max(3, Math.floor(sorted.length * 0.6))).sort(() => Math.random() - 0.5);
+    for (let i = 0; i < chosen.length && i < spots.length; i++) {
+      const room = spots[i];
+      const px = room.center.x + rnd(-2.2, 2.2);
+      const pz = room.center.z + rnd(-1.8, 1.8);
+      const { group: tg, spinner } = makeToolPickupMesh(chosen[i]);
+      tg.position.set(px, 0, pz);
+      tg.rotation.y = rnd(0, Math.PI * 2);
+      group.add(tg);
+      tools.push({ type: chosen[i], group: tg, spinner, pos: tg.position.clone(), taken: false, phase: rnd(0, 6.28) });
+    }
+  }
+
   /* ------------------- techo ------------------- */
   const ceil = new THREE.Mesh(
     new THREE.BoxGeometry(BOUNDS.maxX - BOUNDS.minX + 1, 0.22, BOUNDS.maxZ - BOUNDS.minZ + 1),
@@ -1209,6 +1372,13 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
       else d.panel.position.z = d.baseZ + (d.baseX < 0 ? 1 : -1) * slide;
       d.panel.visible = !d.broken || d.open01 < 0.9;
     }
+    // herramientas: giro + levitación + chispa orbital
+    for (const t of tools) {
+      if (t.taken) continue;
+      t.phase += dt;
+      t.spinner.rotation.y += dt * 1.4;
+      t.spinner.position.y = Math.sin(t.phase * 2.1) * 0.07;
+    }
   };
 
   return {
@@ -1219,6 +1389,7 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
     corridor: corrW,
     loot,
     breakables,
+    tools,
     elevatorPos,
     playerStart: new THREE.Vector3(0, 0, 4.8),
     spawnPoints,
@@ -1238,16 +1409,20 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
 export function makeMedkitMesh(): THREE.Group {
   const g = new THREE.Group();
   const box = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, 0.34, 0.36),
+    rbox(0.5, 0.34, 0.36, 0.07, 2),
     new THREE.MeshStandardMaterial({ color: "#f2f2f2", roughness: 0.5 })
   );
   box.castShadow = true;
   g.add(box);
+  const latch = new THREE.Mesh(rbox(0.1, 0.06, 0.03, 0.012, 1), new THREE.MeshStandardMaterial({ color: "#9aa4ac", metalness: 0.7, roughness: 0.3 }));
+  latch.position.set(0, 0.08, 0.19);
+  g.add(latch);
   const crossMat = new THREE.MeshStandardMaterial({ color: "#ff3b30", emissive: "#ff3b30", emissiveIntensity: 0.8 });
-  const c1 = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.08, 0.02), crossMat);
+  const c1 = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.14, 3, 8), crossMat);
+  c1.rotation.z = Math.PI / 2;
   c1.position.z = 0.19;
   g.add(c1);
-  const c2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.26, 0.02), crossMat);
+  const c2 = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.14, 3, 8), crossMat);
   c2.position.z = 0.19;
   g.add(c2);
   return g;
@@ -1256,15 +1431,23 @@ export function makeMedkitMesh(): THREE.Group {
 export function makeKeyMesh(): THREE.Group {
   const g = new THREE.Group();
   const card = new THREE.Mesh(
-    new THREE.BoxGeometry(0.34, 0.22, 0.04),
+    rbox(0.34, 0.22, 0.045, 0.05, 2),
     new THREE.MeshStandardMaterial({ color: "#38e1d4", emissive: "#38e1d4", emissiveIntensity: 1.4, roughness: 0.3 })
   );
   card.castShadow = true;
   g.add(card);
-  const band = new THREE.Mesh(
-    new THREE.BoxGeometry(0.36, 0.06, 0.05),
+  const chip = new THREE.Mesh(
+    rbox(0.09, 0.07, 0.05, 0.02, 2),
     new THREE.MeshStandardMaterial({ color: "#0a2a28", roughness: 0.4 })
   );
+  chip.position.set(-0.08, 0.03, 0.01);
+  g.add(chip);
+  const band = new THREE.Mesh(
+    new THREE.TorusGeometry(0.11, 0.016, 6, 14, Math.PI),
+    new THREE.MeshStandardMaterial({ color: "#0a2a28", roughness: 0.4 })
+  );
+  band.rotation.z = Math.PI;
+  band.position.y = -0.02;
   g.add(band);
   return g;
 }
@@ -1272,21 +1455,46 @@ export function makeKeyMesh(): THREE.Group {
 export function makeChestMesh(accent: string): THREE.Group {
   const g = new THREE.Group();
   const woodMat = new THREE.MeshStandardMaterial({ color: "#5a3a22", roughness: 0.6 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.55, 0.6), woodMat);
-  body.position.y = 0.06;
+  const goldMat2 = new THREE.MeshStandardMaterial({ color: "#e9b23c", metalness: 0.8, roughness: 0.3, emissive: accent, emissiveIntensity: 0.35 });
+  // cuerpo biselado
+  const body = new THREE.Mesh(rbox(0.92, 0.5, 0.62, 0.07, 3), woodMat);
+  body.position.y = 0.25;
   body.castShadow = true;
   g.add(body);
-  const lid = new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.2, 0.64), woodMat);
-  lid.position.y = 0.4;
-  lid.rotation.x = -0.35;
+  // tapa curva (medio cilindro)
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.9, 14, 1, false, 0, Math.PI), woodMat);
+  lid.rotation.z = Math.PI / 2;
+  lid.rotation.y = Math.PI / 2;
+  lid.position.y = 0.5;
+  lid.castShadow = true;
   g.add(lid);
-  const goldMat2 = new THREE.MeshStandardMaterial({ color: "#e9b23c", metalness: 0.8, roughness: 0.3, emissive: accent, emissiveIntensity: 0.35 });
-  const band = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.1, 0.66), goldMat2);
-  band.position.y = 0.28;
-  g.add(band);
-  const lock = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.08), goldMat2);
-  lock.position.set(0, 0.34, 0.33);
-  g.add(lock);
+  // bandas doradas (una frontal curva + dos planas)
+  const bandF = new THREE.Mesh(new THREE.TorusGeometry(0.315, 0.028, 8, 16, Math.PI), goldMat2);
+  bandF.position.set(0, 0.5, 0.3);
+  bandF.rotation.y = Math.PI / 2;
+  bandF.rotation.z = Math.PI;
+  g.add(bandF);
+  const bandB = bandF.clone();
+  bandB.position.z = -0.3;
+  g.add(bandB);
+  const strap = new THREE.Mesh(rbox(0.96, 0.09, 0.66, 0.02, 2), goldMat2);
+  strap.position.y = 0.42;
+  g.add(strap);
+  // candado colgante
+  const lockBody = new THREE.Mesh(rbox(0.15, 0.17, 0.09, 0.035, 2), goldMat2);
+  lockBody.position.set(0, 0.36, 0.34);
+  g.add(lockBody);
+  const shackle = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.014, 6, 12, Math.PI), goldMat2);
+  shackle.position.set(0, 0.45, 0.34);
+  g.add(shackle);
+  // patas
+  for (const px of [-0.36, 0.36]) {
+    for (const pz of [-0.22, 0.22]) {
+      const foot = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), goldMat2);
+      foot.position.set(px, 0.03, pz);
+      g.add(foot);
+    }
+  }
   return g;
 }
 

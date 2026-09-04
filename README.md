@@ -21,29 +21,29 @@
 
 ## 🎮 JUEGO JUGABLE 3D — HOTEL ∞: GRAND HOTEL · NOCHE INFINITA (action-survival)
 
-**El juego ya se juega dentro del sitio.** Pulsa **▶ JUGAR** (es la vista principal). v4.0 triplica el tamaño del hotel: **lobby con fuente dorada, 3 alas, 12 habitaciones enormes (91 m²), salas especiales con tesoros, 9 clases de monstruos y 5 construcciones defensivas**. Sobrevive 3 oleadas por noche, elige mejoras roguelite y sube — **los pisos nunca terminan**.
+**El juego ya se juega dentro del sitio.** Pulsa **▶ JUGAR** (es la vista principal). v4.1 lo pule todo: **nada de cubos crudos** — avatares con extremidades de cápsula y cabezas esféricas, mobiliario biselado y torneado (camas con cojines, sofás con apoyacodos, vasijas y lámparas de tornamesa, bañeras curvas, cofres de tapa abombada) — y un **arsenal de 6 herramientas recogibles** con estadísticas propias. El hotel sigue siendo GRAND: **lobby con fuente dorada, 3 alas, 12 habitaciones enormes (91 m²), salas especiales con tesoros, 9 clases de monstruos y 5 construcciones defensivas**. Sobrevive 3 oleadas por noche, elige mejoras roguelite y sube — **los pisos nunca terminan**.
 
 | | |
 |---|---|
 | ![Lobby con fuente](docs/screenshots/game-lobby.jpg) | ![Salón de baile](docs/screenshots/game-salon.jpg) |
-| *Lobby ∞: fuente dorada, lámpara de araña y minimapa en vivo* | *Salón de Baile: parqué, columnas, piano y oro (+150 pts)* |
+| *Lobby ∞: escoba de cerdas al hombro, fuente torneada y minimapa en vivo* | *Salón de Baile: parqué, columnas, piano y oro (+150 pts)* |
 | ![La Bóveda](docs/screenshots/game-boveda.jpg) | ![Noche en el ala oeste](docs/screenshots/game-noche.jpg) |
-| *La BÓVEDA: doble cerradura, lingotes y gemas — jackpot 240+* | *Oleada nocturna: 9 clases de anomalías y élites dorados* |
-| ![Cocina](docs/screenshots/game-cocina.jpg) | ![Móvil](docs/screenshots/game-mobile.jpg) |
-| *Cocina: platos y jarrones rompibles con la escoba* | *Joystick + 5 construcciones + botones táctiles* |
+| *La BÓVEDA: doble cerradura, lingotes y gemas — jackpot 240+* | *Oleada nocturna: barrido de plumero entre 9 clases de anomalías* |
+| ![Tu botones](docs/screenshots/game-avatar.jpg) | ![Móvil](docs/screenshots/game-mobile.jpg) |
+| *Tu botones: cápsulas, cabeza esférica y escoba de cerdas de verdad* | *Joystick + 5 construcciones + chip de herramienta equipada* |
 
 **El loop completo (90–120 s por piso):**
 
-1. 🏗️ **FASE DE DÍA (60 s)** — explora con el **minimapa en vivo**: 8 habitaciones temáticas (dobles, king, baños con espejos, almacenes con cofres garantizados) + 4 salas especiales: **Salón de Baile** (piano y columnas), **Cocina** (platos rompibles), **Suite ∞** (jacuzzi y dosel) y la **BÓVEDA** con doble cerradura: lingotes, gemas y cofre de 240+ monedas. Rompe jarrones y platos con la escoba para conseguir monedas extra.
+1. 🏗️ **FASE DE DÍA (60 s)** — explora con el **minimapa en vivo**: 8 habitaciones temáticas (dobles, king, baños con espejos, almacenes con cofres garantizados) + 4 salas especiales: **Salón de Baile** (piano y columnas), **Cocina** (platos rompibles), **Suite ∞** (jacuzzi y dosel) y la **BÓVEDA** con doble cerradura: lingotes, gemas y cofre de 240+ monedas. Rompe jarrones y platos para conseguir monedas extra. En cada piso hay **3 herramientas brillando** en salas lejanas: pasa por encima para equiparlas.
 2. 🌙 **NOCHE — 3 OLEADAS** — **9 clases de anomalías**: Sombra, Maleta veloz, Altísimo, Fantasma que atraviesa muros, **Cucarachas en enjambres de 3**, **Camarista** que lanza botellas de lejía a distancia, **Gólem de equipaje** blindado que destroza barricadas, **Niño perdido** que se teletransporta y, cada 3 pisos, **EL GERENTE** con esbirras. Desde el piso 3 aparecen **ÉLITES dorados** con 1,9× de vida y botín extra.
 3. 🔨 **5 CONSTRUCCIONES** — Barricada de maletas (25 🪙), Torreta automática (60 🪙), Botiquín (40 🪙), **Trampa de pinchos** (35 🪙, 12 usos) y **Velador Santo** (50 🪙, aura que ralentiza enemigos y te cura).
-4. ⚔️ **COMBATE** — golpe de escoba con arco y knockback (`clic`/`J`), dash con invulnerabilidad (`Shift`), combos ×8, daño flotante, screen-shake y partículas.
+4. ⚔️ **COMBATE CON 6 HERRAMIENTAS** — empiezas con la **escoba de cerdas** y encuentras por el hotel (o te sueltan élites y el Gerente): **Plumero** rápido (13 dmg · 0,24 s), **Sartén** contundente (34 dmg · empuje ×1,7), **Bate** de alcance (27 dmg · ⇢2,5 · empuje ×2,1), **Hacha de bombero** brutal (44 dmg) y **Varita ∞** etérea (arco de 180°). Cada una con su malla estilizada, color de destellos y cadencia propia. Dash con invulnerabilidad (`Shift`), combos ×8, daño flotante, screen-shake y partículas octaédricas.
 5. 📋 **MISIONES DINÁMICAS** — 3 activas por piso de un pool de 13: saquear la BÓVEDA, exterminar cucarachas, romper muebles, derrotar élites…
 6. 🎴 **MEJORAS ROGUELITE** — al llegar las 6:00 AM elige 1 de 3 entre 12 mejoras y sube al siguiente piso procedural.
 
 **Controles:** `WASD` mover · ratón cámara · `clic`/`J` golpear · `Shift` dash · `Espacio` saltar · `E` puertas/cofres/bóveda/ascensor · `1–5` construir · `Q` cancelar · `P` pausa. **Móvil:** joystick + botones + barra de construcción.
 
-**Bajo el capó:** motor propio sobre [Three.js](https://threejs.org/) (~4.300 líneas de TypeScript en `src/game/`): generador de GRAND HOTEL con 3 alas, 12 habitaciones de 91 m² y 4 salas especiales (`world.ts`), 9 enemigos con IA de navegación por alas y rutas por puertas, ataques melee/rango y teletransporte (`enemy.ts`), 5 construcciones colocables con validación de rejilla (`builds.ts`), director de oleadas con jefes y esbirras, sistema de misiones por eventos (`missions.ts`), mejoras roguelite, minimapa en vivo, cámara 3ª persona con raycast anti-muros, iluminación día/noche dinámica, audio 100% sintetizado con WebAudio (sin assets) y récord en `localStorage`.
+**Bajo el capó:** motor propio sobre [Three.js](https://threejs.org/) (~4.600 líneas de TypeScript en `src/game/`): generador de GRAND HOTEL con 3 alas, 12 habitaciones de 91 m² y 4 salas especiales (`world.ts`), kit de geometría estilizada — `RoundedBoxGeometry`, tornamesas y cápsulas — (`shapes.ts`), 6 herramientas con mallas y stats propios (`tools.ts`), 9 enemigos con IA de navegación por alas y rutas por puertas, ataques melee/rango y teletransporte (`enemy.ts`), 5 construcciones colocables con validación de rejilla (`builds.ts`), director de oleadas con jefes y esbirras, sistema de misiones por eventos (`missions.ts`), mejoras roguelite, minimapa en vivo, cámara 3ª persona con raycast anti-muros, iluminación día/noche dinámica, audio 100% sintetizado con WebAudio (sin assets) y récord en `localStorage`.
 
 > La demo demuestra el loop de acción descrito en el GDD. El juego completo vive en Roblox Studio — el código Luau de referencia está en la vista CÓDIGO.
 
@@ -71,7 +71,7 @@ El concepto ganador — **Hotel ∞ Infinito**, terror cómico cooperativo con p
 | 🔬 **LAB** | Radiografía del mercado con métricas animadas, 5 insights de diseño, 3 conceptos con loop y escenarios, tabla comparativa y veredicto razonado |
 | 🏨 **HOTEL ∞** | GDD completo: pilares, roles, economia de propinas, escenarios firma (Piscina Sin Fin, Piso Espejo, La Caldera), sistemas y UI |
 | 🗺️ **PLAN** | Roadmap de 12 semanas en 4 fases: prototipo vertical → generador procedural → beta cerrada → lanzamiento y live-ops |
-| 🎮 **JUGAR** | GRAND HOTEL jugable v4.0: lobby + 3 alas + 12 habitaciones grandes, 4 salas especiales, Bóveda, 9 monstruos, 5 construcciones, oleadas, misiones, mejoras y pisos infinitos |
+| 🎮 **JUGAR** | GRAND HOTEL jugable v4.1: hotel estilizado (cero cubos crudos), 6 herramientas recogibles, lobby + 3 alas + 12 habitaciones grandes, 4 salas especiales, Bóveda, 9 monstruos, 5 construcciones, oleadas, misiones, mejoras y pisos infinitos |
 | 💻 **CÓDIGO** | Referencia técnica en Luau: arquitectura cliente/servidor, sistema de gráficos y patrón de generación procedural |
 
 ## 🧩 Los tres conceptos
