@@ -360,7 +360,7 @@ export default function Game3D() {
             <div className="mt-5 grid grid-cols-2 gap-2 text-left text-[11px] sm:grid-cols-4">
               {[
                 { icon: Gamepad2, txt: "WASD moverse · ratón cámara" },
-                { icon: Swords, txt: "Clic / J: golpe de escoba" },
+                { icon: Swords, txt: "Coge herramientas: bate, sartén, hacha…" },
                 { icon: Shield, txt: "1–5: barricada, torreta, botiquín, trampa, velador" },
                 { icon: MousePointer2, txt: "E: puertas · cofres · bóveda · ascensor" },
               ].map((c, i) => (

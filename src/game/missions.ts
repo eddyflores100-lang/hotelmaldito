@@ -38,7 +38,7 @@ const TEMPLATES: Array<(floor: number) => Mission> = [
   () => mk("Encuentra una llave-tarjeta", 1, 45, (e) => (e.kind === "key" ? 1 : 0)),
   () => mk("Consigue un cofre del tesoro", 1, 60, (e) => (e.kind === "coin" && e.amount >= 40 ? 1 : 0)),
   () => mk("Construye 2 torretas", 2, 65, (e) => (e.kind === "build" && e.what === "turret" ? 1 : 0)),
-  () => mk("Rompe 4 muebles con la escoba", 4, 40, (e) => (e.kind === "break" ? 1 : 0)),
+  () => mk("Rompe 4 muebles con tu herramienta", 4, 40, (e) => (e.kind === "break" ? 1 : 0)),
   () => mk("Coloca una trampa de pinchos", 1, 45, (e) => (e.kind === "build" && e.what === "trap" ? 1 : 0)),
   () => mk("ABRE LA BÓVEDA", 1, 90, (e) => (e.kind === "vault" ? 1 : 0)),
   (f) => mk(`Extermina 3 cucarachas`, 3, 40 + f * 4, (e) => (e.kind === "kill" && e.enemy === "cucaracha" ? 1 : 0)),

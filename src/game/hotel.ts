@@ -26,9 +26,9 @@ export const CURATED_FLOORS: FloorTheme[] = [
     subtitle: "Piso 13 · área húmeda",
     intro: "Huele a cloro viejo y algo nada en círculos. Atiende el turno y no mires demasiado el agua de los cuadros.",
     accent: "#38e1d4",
-    carpet: "#0e4a46",
-    wall: "#16303c",
-    fog: "#0a1a22",
+    carpet: "#0f6a60",
+    wall: "#1d4a58",
+    fog: "#0e2833",
     anomalyChance: 0.28,
     arrivalMin: 7,
     arrivalMax: 12,
@@ -39,9 +39,9 @@ export const CURATED_FLOORS: FloorTheme[] = [
     subtitle: "Piso infinito · área reflejada",
     intro: "Todo está al revés: los pasillos, los números y algunos huéspedes. Los espejos copian cada paso que das.",
     accent: "#ffa02f",
-    carpet: "#5a2a10",
-    wall: "#33241c",
-    fog: "#1a120c",
+    carpet: "#6e3413",
+    wall: "#4a3223",
+    fog: "#241811",
     anomalyChance: 0.38,
     arrivalMin: 5.5,
     arrivalMax: 9.5,
@@ -52,9 +52,9 @@ export const CURATED_FLOORS: FloorTheme[] = [
     subtitle: "Subsótano · corazón del hotel",
     intro: "El corazón del hotel late abajo. Aquí llegan los huéspedes que ningún otro piso quiere registrar.",
     accent: "#ff6a3d",
-    carpet: "#4a1410",
-    wall: "#2e1a16",
-    fog: "#180c08",
+    carpet: "#5c1a14",
+    wall: "#43241d",
+    fog: "#221109",
     anomalyChance: 0.46,
     arrivalMin: 4.5,
     arrivalMax: 8,
@@ -76,9 +76,9 @@ export function floorThemeFor(index: number): FloorTheme {
   const i = index - CURATED_FLOORS.length;
   const [name, intro] = EXTRA_NAMES[i % EXTRA_NAMES.length];
   const hue = (0.08 + i * 0.13) % 1;
-  const col = new THREE.Color().setHSL(hue, 0.45, 0.16).getHexString();
+  const col = new THREE.Color().setHSL(hue, 0.45, 0.2).getHexString();
   const accent = new THREE.Color().setHSL(hue, 0.85, 0.6).getHexString();
-  const fog = new THREE.Color().setHSL(hue, 0.4, 0.05).getHexString();
+  const fog = new THREE.Color().setHSL(hue, 0.4, 0.08).getHexString();
   return {
     code: `P-${13 + (i + 1) * 9}`,
     name: `PISO ${name}`,
@@ -86,7 +86,7 @@ export function floorThemeFor(index: number): FloorTheme {
     intro,
     accent: `#${accent}`,
     carpet: `#${col}`,
-    wall: `#${new THREE.Color().setHSL(hue, 0.3, 0.13).getHexString()}`,
+    wall: `#${new THREE.Color().setHSL(hue, 0.34, 0.17).getHexString()}`,
     fog: `#${fog}`,
     anomalyChance: Math.min(0.62, 0.5 + i * 0.04),
     arrivalMin: Math.max(3.2, 4.2 - i * 0.25),

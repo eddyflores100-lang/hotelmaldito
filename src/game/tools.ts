@@ -1,13 +1,13 @@
 /* ============================================================
-   HOTEL ∞ INFINITO — Herramientas recogibles (6).
-   Cada herramienta es una malla estilizada (cero cubos crudos)
-   con estadísticas propias de daño / alcance / cadencia.
-   Se recogen caminando sobre ellas y se equipan al instante.
+   HOTEL ∞ INFINITO — Herramientas recogibles.
+   El jugador EMPIEZA CON LOS PUÑOS y debe COGER herramientas
+   de la mesa del lobby o de los pedestales repartidos por el
+   hotel. Cada malla es estilizada (cero palos con escoba).
    ============================================================ */
 import * as THREE from "three";
-import { bristleFan, rbox, std } from "./shapes";
+import { rbox, std } from "./shapes";
 
-export type ToolType = "escoba" | "plumero" | "sarten" | "bate" | "hacha" | "varita";
+export type ToolType = "punos" | "plumero" | "sarten" | "bate" | "hacha" | "varita";
 
 export type ToolStats = {
   name: string;
@@ -22,7 +22,7 @@ export type ToolStats = {
 };
 
 export const TOOLS: Record<ToolType, ToolStats> = {
-  escoba:  { name: "ESCOBA",       desc: "Fiel y ligera",        dmg: 19, reach: 2.15, cd: 0.42, knock: 1.0, arcDot: 0.35, color: "#d9a44a", glow: "#a8e63c" },
+  punos:   { name: "PUÑOS",        desc: "Coge una herramienta", dmg: 8,  reach: 1.5,  cd: 0.34, knock: 0.6, arcDot: 0.25, color: "#ffffff", glow: "#cfd8ff" },
   plumero: { name: "PLUMERO",      desc: "Ráfagas veloces",      dmg: 13, reach: 1.9,  cd: 0.24, knock: 0.7, arcDot: 0.4,  color: "#ff9ad5", glow: "#ff9ad5" },
   sarten:  { name: "SARTÉN",       desc: "Golpes contundentes",  dmg: 34, reach: 2.05, cd: 0.6,  knock: 1.7, arcDot: 0.3,  color: "#8fa3b8", glow: "#8fd0ff" },
   bate:    { name: "BATE DE MADERA", desc: "Alcance y empuje",   dmg: 27, reach: 2.5,  cd: 0.55, knock: 2.1, arcDot: 0.3,  color: "#c98d4a", glow: "#ffc46b" },
@@ -30,7 +30,8 @@ export const TOOLS: Record<ToolType, ToolStats> = {
   varita:  { name: "VARITA ∞",     desc: "Arco etéreo amplio",   dmg: 24, reach: 2.75, cd: 0.36, knock: 1.0, arcDot: 0.05, color: "#57e6ff", glow: "#57e6ff" },
 };
 
-export const TOOL_ORDER: ToolType[] = ["escoba", "plumero", "sarten", "bate", "hacha", "varita"];
+/** Herramientas que aparecen como pickup en el mundo (los puños no). */
+export const TOOL_ORDER: ToolType[] = ["plumero", "sarten", "bate", "hacha", "varita"];
 
 /* ------------------------------ mallas ------------------------------ */
 
@@ -40,7 +41,6 @@ export const TOOL_ORDER: ToolType[] = ["escoba", "plumero", "sarten", "bate", "h
  */
 export function makeToolMesh(type: ToolType): THREE.Group {
   const g = new THREE.Group();
-  const wood = std("#8a5a30", 0.65);
   const darkWood = std("#5a3a22", 0.7);
 
   const pole = (len: number, rTop: number, rBottom: number, mat: THREE.Material, z0 = 0): THREE.Mesh => {
@@ -52,21 +52,8 @@ export function makeToolMesh(type: ToolType): THREE.Group {
   };
 
   switch (type) {
-    case "escoba": {
-      // mango cónico + férula + abanico de cerdas de verdad
-      g.add(pole(1.35, 0.028, 0.042, wood));
-      const ferrule = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.12, 10), std("#b0893a", 0.4, 0.6));
-      ferrule.rotation.x = Math.PI / 2;
-      ferrule.position.z = 1.4;
-      g.add(ferrule);
-      const bristles = bristleFan(18, 2.0, 0.6, 0.024, std("#d9a44a", 0.9));
-      bristles.position.z = 1.44;
-      bristles.rotation.x = 0.85; // caen hacia adelante
-      g.add(bristles);
-      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.016, 8, 14), std("#a8e63c", 0.5, 0.2, "#4a7a10", 0.35));
-      collar.position.z = 1.5;
-      collar.rotation.y = Math.PI / 2;
-      g.add(collar);
+    case "punos": {
+      // sin herramienta: la mano queda vacía (nada que mostrar)
       break;
     }
     case "plumero": {

@@ -113,7 +113,7 @@ export class Game {
   private reachMult = 1;
   private magnetMult = 1;
   private coinMult = 1;
-  private tool: ToolType = "escoba";
+  private tool: ToolType = "punos";
   private toolMesh: THREE.Group | null = null;
   private toolDrops: { type: ToolType; group: THREE.Group; spinner: THREE.Group; pos: THREE.Vector3; phase: number }[] = [];
   private dashCd = 0;
@@ -206,12 +206,12 @@ export class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.18;
+    this.renderer.toneMappingExposure = 1.28;
 
     this.camera = new THREE.PerspectiveCamera(58, 1, 0.1, 130);
     this.scene.add(this.camera);
 
-    this.hemi = new THREE.HemisphereLight(new THREE.Color("#5a72a8"), new THREE.Color("#12182a"), 1.5);
+    this.hemi = new THREE.HemisphereLight(new THREE.Color("#6a84bc"), new THREE.Color("#1c2438"), 1.7);
     this.scene.add(this.hemi);
     this.moon = new THREE.DirectionalLight(new THREE.Color("#9db8e8"), 1.9);
     this.moon.position.set(-9, 12, 7);
@@ -226,18 +226,18 @@ export class Game {
     const fill = new THREE.AmbientLight(new THREE.Color("#2e3d5e"), 0.8);
     this.scene.add(fill);
 
-    // jugador
+    // jugador · paleta clásica Roblox (cabeza/brazos amarillos, torso azul, piernas verdes)
     this.player = new Avatar({
       skin: "#f5cd30",
-      torso: "#1d3a6e",
+      torso: "#1d6fc4",
       arms: "#f5cd30",
-      legs: "#20242c",
+      legs: "#67b53c",
       face: "happy",
       hat: "bellhop",
-      hatColor: "#1d3a6e",
+      hatColor: "#173a66",
     });
     this.playerGroup.add(this.player.group);
-    this.equipTool("escoba", true);
+    this.equipTool("punos", true);
     this.scene.add(this.playerGroup);
 
     // fantasmas de construcción
@@ -702,7 +702,7 @@ export class Game {
     this.floorIndex = 0;
     this.buildMode = null;
     for (const k of Object.keys(this.ghosts) as BuildKind[]) this.ghosts[k].visible = false;
-    this.equipTool("escoba", true);
+    this.equipTool("punos", true);
     this.buildFloor(0);
     this.audio.init();
     this.audio.startAmbient();
@@ -1545,8 +1545,8 @@ export class Game {
 
     // iluminación día/noche
     this.lightK = damp(this.lightK, this.targetLightK, 1.2, dt);
-    this.hemi.intensity = 0.92 + this.lightK * 0.7;
-    this.moon.intensity = 1.3 + this.lightK * 0.75;
+    this.hemi.intensity = 1.05 + this.lightK * 0.85;
+    this.moon.intensity = 1.45 + this.lightK * 0.9;
     this.moon.color.setHSL(0.6, 0.5, 0.55 + this.lightK * 0.1);
     if (this.scene.fog instanceof THREE.Fog) {
       this.scene.fog.near = 20 + this.lightK * 6;

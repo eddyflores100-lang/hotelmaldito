@@ -24,6 +24,31 @@ export function damp(a: number, b: number, k: number, dt: number): number {
   return lerp(a, b, 1 - Math.exp(-k * dt));
 }
 
+/* ------------------------- studs de Roblox ------------------------- */
+
+/**
+ * Dibuja la rejilla de "studs" clásica de Roblox sobre un contexto 2D
+ * (relieves circulares sutiles). Se aplica a suelos para dar el look
+ * de plataforma Roblox sin dejar de ser un hotel elegante.
+ */
+export function drawStuds(g: CanvasRenderingContext2D, w: number, h: number, step: number, alpha = 0.085): void {
+  const r = step * 0.3;
+  for (let y = step / 2; y < h + step / 2; y += step) {
+    for (let x = step / 2; x < w + step / 2; x += step) {
+      // sombra del stud (abajo-derecha)
+      g.fillStyle = `rgba(0,0,0,${alpha * 1.15})`;
+      g.beginPath();
+      g.arc(x + r * 0.18, y + r * 0.22, r, 0, Math.PI * 2);
+      g.fill();
+      // cara iluminada del stud (arriba)
+      g.fillStyle = `rgba(255,255,255,${alpha})`;
+      g.beginPath();
+      g.arc(x - r * 0.1, y - r * 0.12, r * 0.92, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+}
+
 /* ------------------------------ caras ------------------------------ */
 
 export type FaceVariant = "happy" | "worried" | "angry" | "empty" | "red";
@@ -338,7 +363,15 @@ export function signTexture(text: string, bg: string, fg: string, sub?: string):
   g.fillStyle = fg;
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.font = "bold 56px 'Bungee', 'Arial Black', sans-serif";
+  // auto-ajuste: el texto nunca se sale del rótulo
+  let size = sub ? 44 : 56;
+  g.font = `bold ${size}px 'Bungee', 'Arial Black', sans-serif`;
+  const maxW = 228;
+  const w = g.measureText(text).width;
+  if (w > maxW) {
+    size = Math.max(16, Math.floor(size * (maxW / w)));
+    g.font = `bold ${size}px 'Bungee', 'Arial Black', sans-serif`;
+  }
   g.fillText(text, 128, sub ? 52 : 64);
   if (sub) {
     g.font = "bold 26px 'Arial', sans-serif";
@@ -417,6 +450,8 @@ export function parquetTexture(): THREE.CanvasTexture {
       g.stroke();
     }
   }
+  // studs sutiles para el look Roblox
+  drawStuds(g, 256, 256, 32, 0.07);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -451,6 +486,8 @@ export function tileTexture(): THREE.CanvasTexture {
       g.fill();
     }
   }
+  // studs sutiles para el look Roblox
+  drawStuds(g, 256, 256, 64, 0.1);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;

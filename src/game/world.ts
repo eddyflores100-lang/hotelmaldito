@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { type FloorTheme } from "./hotel";
 import {
   carpetTexture, paintingTexture, signTexture, woodTexture, wallpaperTexture,
-  parquetTexture, tileTexture, goldMaterial, gemMaterial,
+  parquetTexture, tileTexture, goldMaterial, gemMaterial, drawStuds,
   disposeObject, damp, rnd, irnd,
 } from "./util";
 import { rbox, lathe, std } from "./shapes";
@@ -196,7 +196,7 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
   /* ------------------------- materiales comunes ------------------------- */
   const wallTex = wallpaperTexture(theme.wall, theme.accent);
   wallTex.repeat.set(4, 1.5);
-  const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.88 });
+  const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.55, metalness: 0.02 });
   const trimMat = new THREE.MeshStandardMaterial({ color: "#241610", roughness: 0.6 });
   const woodMat = new THREE.MeshStandardMaterial({ map: wood, roughness: 0.62 });
   const brassMat = new THREE.MeshStandardMaterial({ color: "#8a6a2f", roughness: 0.32, metalness: 0.85 });
@@ -294,18 +294,31 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
   };
 
   /* =============================== LOBBY =============================== */
-  // muros del hub con huecos: pasillo oeste (z -2.3..2.3 en x=-8.2),
-  // este (x=8.2), norte (x -2.3..2.3 en z=-8.2) y ascensor (x -6.7..-4.3)
-  addWall("x", -8.2, -8.4, 8.4);                                        // sur
-  addWall("z", -8.2, -8.4, -6.7);                                       // norte (izq del ascensor)
-  addWall("z", -8.2, -4.3, -2.3);                                       // norte (entre ascensor y pasillo)
-  addWall("z", -8.2, 2.3, 8.4);                                         // norte (der del pasillo)
-  // oeste / este con hueco central de pasillo
-  addWall("x", -8.2, -8.4, -2.3);
-  addWall("x", -8.2, 2.3, 8.4);
-  addWall("x", 8.2, -8.4, -2.3);
-  addWall("x", 8.2, 2.3, 8.4);
-  addWall("x", 8.2, -2.3, 2.3);   // cierre sur del lobby (tapaba la cámara)
+  // El lobby es la caja x[-8.4, 8.4] × z[-8.4, 8.4].
+  // Huecos del muro NORTE (z=-8.2): nicho del ascensor x[-6.7,-4.3] y
+  // boca del pasillo norte x[-2.3,2.3]. Los muros llegan hasta x=±11.3
+  // para empalmar con el ala norte y no dejar esquinas abiertas.
+  addWall("x", -8.2, -11.3, -6.7);   // norte · izquierda del ascensor
+  addWall("x", -8.2, -4.3, -2.3);    // norte · entre ascensor y pasillo
+  addWall("x", -8.2, 2.3, 11.3);     // norte · derecha del pasillo
+  // Muros OESTE / ESTE (x=∓8.2) con la boca del pasillo z[-2.3,2.3];
+  // bajan hasta z=±11.3 para cerrar el borde este de las hab 103/108.
+  addWall("z", -8.2, -11.3, -2.3);   // oeste · tramo norte
+  addWall("z", -8.2, 2.3, 11.3);     // oeste · tramo sur
+  addWall("z", 8.2, -11.3, -2.3);    // este · tramo norte
+  addWall("z", 8.2, 2.3, 11.3);      // este · tramo sur
+  // Muro SUR (z=8.2) cerrado del todo (protege la cámara)
+  addWall("x", 8.2, -8.4, 8.4);
+
+  // Macizos de esquina: donde se cruzan las tres crujías las plantas se
+  // solapan 2,5 × 2,5 m; los sellamos como pilares estructurales.
+  addBox(2.5, H, 2.5, -9.65, H / 2, -9.65, wallMat, true);  // NO · salón × hab oeste
+  addBox(2.5, H, 2.5, 9.65, H / 2, -9.65, wallMat, true);   // NE · cocina × hab este
+
+  // Testeros laterales del nicho del ascensor (sin ellos el nicho
+  // quedaría abierto hacia el SALÓN DE BAILE que está justo detrás).
+  addWall("z", -6.7, -9.5, -8.3);
+  addWall("z", -4.3, -9.5, -8.3);
 
   // alfombra grande del lobby
   const hubCarpet = new THREE.Mesh(
@@ -496,7 +509,7 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
       new THREE.PlaneGeometry(2.7, 1.1),
       new THREE.MeshBasicMaterial({ map: signTexture(theme.code, "#0a0f1a", theme.accent, theme.name) })
     );
-    floorSign.position.set(-5.5, 4.75, -8.15);
+    floorSign.position.set(-5.5, 4.78, -7.86);
     group.add(floorSign);
   }
 
@@ -524,6 +537,7 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
   addWall("x", -19.9, 2.7, 10.9);
 
   // muros de pasillo con huecos de puerta
+  // (llegan hasta x=∓8.0 para penetrar los muros del lobby y no dejar rendijas)
   for (const wing of ["west", "east"] as const) {
     const sx = wing === "west" ? -1 : 1;
     for (const sz of [-1, 1] as const) {
@@ -531,8 +545,8 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
       const gaps: [number, number][] = ROOM_DEFS
         .filter((r) => r.wing === wing && Math.sign(r.dz) === sz)
         .map((r) => [r.dx - 1.0, r.dx + 1.0] as [number, number]);
-      const a = sx < 0 ? -33.2 : 8.2;
-      const b = sx < 0 ? -8.2 : 33.2;
+      const a = sx < 0 ? -33.2 : 8.0;
+      const b = sx < 0 ? -8.0 : 33.2;
       for (const [s, e] of segmentsWithGaps(a, b, gaps)) {
         addWall("x", zc, s, e);
         addTrim("x", zc, s, e, -sz);
@@ -599,10 +613,10 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
     bulb.position.set(i % 2 ? 2.2 : -2.2, 4.3, z);
     group.add(bulb);
   }
-  // cuadros de pasillo
+  // cuadros de pasillo (a ras del muro, sin hundirse)
   for (let i = 0; i < 8; i++) {
     const x = -26 + (i % 4) * 17.3;
-    addPainting(x, 3.1, i % 2 ? 2.32 : -2.32, i % 2 ? Math.PI : 0, floorIndex * 5 + i);
+    addPainting(x, 3.1, i % 2 ? 2.25 : -2.25, i % 2 ? Math.PI : 0, floorIndex * 5 + i);
   }
 
   /* ============================ HABITACIONES ============================ */
@@ -1098,8 +1112,9 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
       parquet.position.set(cx, 0.018, cz);
       parquet.receiveShadow = true;
       group.add(parquet);
-      // columnas
+      // columnas (se omite la del NO: ahí queda el macizo estructural)
       for (const [px, pz] of [[x1 + 1.2, z1 + 1.2], [x2 - 1.2, z1 + 1.2], [x1 + 1.2, z2 - 1.2], [x2 - 1.2, z2 - 1.2]]) {
+        if (pz > -10.9 && Math.abs(px) > 8.3) continue;
         const col = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.46, H, 14), new THREE.MeshStandardMaterial({ color: "#cfc4ae", roughness: 0.5 }));
         col.position.set(px, H / 2, pz);
         col.castShadow = true;
@@ -1191,7 +1206,7 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
         addPlate(cx + 0.7 + px, 1.14, cz + 0.3 + pz);
       }
       addVase(cx + 1.75, cz + 0.05, 1.06);
-      addCrateStack(cx + 3.5, cz + 3.9);
+      addCrateStack(cx + 3.2, cz + 2.9);
       addMedkit(cx + 3.4, cz - 2.2);
       for (let c = 0; c < 4; c++) addCoin(cx + rnd(-2.5, 3.5), cz + rnd(-3.4, 2), irnd(3, 8));
       addPainting(x2 - 0.12, 3.0, cz - 2.4, -Math.PI / 2, floorIndex + 5);
@@ -1297,23 +1312,50 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
 
   /* ------------------- herramientas recogibles ------------------- */
   const tools: ToolPickup[] = [];
+  const addToolPickup = (type: ToolType, x: number, y: number, z: number, ry = 0): void => {
+    const { group: tg, spinner } = makeToolPickupMesh(type);
+    tg.position.set(x, y, z);
+    tg.rotation.y = ry;
+    group.add(tg);
+    tools.push({ type, group: tg, spinner, pos: tg.position.clone(), taken: false, phase: rnd(0, 6.28) });
+  };
   {
-    // 3 herramientas por piso en salas distintas (siempre incluye una potente)
-    const pool: ToolType[] = [...TOOL_ORDER].filter((t) => t !== "escoba").sort(() => Math.random() - 0.5);
+    // MESA DE BIENVENIDA en el lobby: el jugador empieza sin herramienta
+    // y aquí coge la primera (bate / sartén / plumero a la vista).
+    const tblX = 3.6, tblZ = -6.1;
+    addBox(2.7, 0.1, 1.05, tblX, 0.85, tblZ, woodMat, true);
+    for (const lx of [-1.15, 1.15]) {
+      for (const lz of [-0.38, 0.38]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 0.8, 8), trimMat);
+        leg.position.set(tblX + lx, 0.4, tblZ + lz);
+        leg.castShadow = true;
+        group.add(leg);
+      }
+    }
+    // cartel inclinado sobre poste
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.85, 8), brassMat);
+    post.position.set(tblX, 1.32, tblZ - 0.36);
+    group.add(post);
+    const tblSign = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.8, 0.45),
+      new THREE.MeshBasicMaterial({ map: signTexture("HERRAMIENTAS", "#151009", "#e9b23c") })
+    );
+    tblSign.position.set(tblX, 1.78, tblZ - 0.3);
+    tblSign.rotation.x = -0.55;
+    group.add(tblSign);
+    addToolPickup("bate", tblX - 0.8, 0.9, tblZ + 0.26, 0.4);
+    addToolPickup("sarten", tblX, 0.9, tblZ + 0.26, -0.35);
+    addToolPickup("plumero", tblX + 0.8, 0.9, tblZ + 0.26, 1.25);
+
+    // 3 herramientas extra repartidas por salas del piso (siempre incluye una potente)
+    const pool: ToolType[] = [...TOOL_ORDER].sort(() => Math.random() - 0.5);
     const chosen = pool.slice(0, 3);
     if (!chosen.includes("hacha") && Math.random() < 0.4) chosen[2] = "hacha";
     const candidates = rooms.filter((r) => !r.door.locked);
     const sorted = [...candidates].sort((a, b) => Math.hypot(b.center.x, b.center.z) - Math.hypot(a.center.x, a.center.z));
     const spots = sorted.slice(0, Math.max(3, Math.floor(sorted.length * 0.6))).sort(() => Math.random() - 0.5);
     for (let i = 0; i < chosen.length && i < spots.length; i++) {
-      const room = spots[i];
-      const px = room.center.x + rnd(-2.2, 2.2);
-      const pz = room.center.z + rnd(-1.8, 1.8);
-      const { group: tg, spinner } = makeToolPickupMesh(chosen[i]);
-      tg.position.set(px, 0, pz);
-      tg.rotation.y = rnd(0, Math.PI * 2);
-      group.add(tg);
-      tools.push({ type: chosen[i], group: tg, spinner, pos: tg.position.clone(), taken: false, phase: rnd(0, 6.28) });
+      addToolPickup(chosen[i], spots[i].center.x + rnd(-2.2, 2.2), 0, spots[i].center.z + rnd(-1.8, 1.8), rnd(0, Math.PI * 2));
     }
   }
 
@@ -1391,7 +1433,7 @@ export function buildWorld(scene: THREE.Scene, theme: FloorTheme, quality: "high
     breakables,
     tools,
     elevatorPos,
-    playerStart: new THREE.Vector3(0, 0, 4.8),
+    playerStart: new THREE.Vector3(0, 0, 3.0),
     spawnPoints,
     bounds: BOUNDS,
     map,
@@ -1508,7 +1550,7 @@ function marbleFloorTex(): THREE.CanvasTexture {
   for (let y = 0; y < 4; y++) {
     for (let x = 0; x < 4; x++) {
       const even = (x + y) % 2 === 0;
-      g.fillStyle = even ? "#20293c" : "#39445c";
+      g.fillStyle = even ? "#26334e" : "#414f6e";
       g.fillRect(x * tile, y * tile, tile, tile);
       g.strokeStyle = "rgba(0,0,0,0.4)";
       g.lineWidth = 2;
@@ -1525,6 +1567,8 @@ function marbleFloorTex(): THREE.CanvasTexture {
       }
     }
   }
+  // rejilla de studs clásica Roblox sobre el mármol
+  drawStuds(g, 256, 256, 32, 0.09);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
