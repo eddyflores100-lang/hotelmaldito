@@ -169,8 +169,13 @@ function TopHud({ view, onSelect }: { view: View; onSelect: (v: View) => void })
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:px-8">
         <button onClick={() => onSelect("lab")} className="group flex cursor-pointer items-center gap-2.5">
           <IconCube className="h-6 w-6 text-cyan transition-transform duration-300 group-hover:rotate-12" />
-          <span className="font-display text-sm tracking-wide text-paper">
-            GAME<span className="text-amber">LAB</span>
+          <span className="flex flex-col leading-none">
+            <span className="font-display text-sm tracking-wide text-paper">
+              GAME<span className="text-amber">LAB</span>
+            </span>
+            <span className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.28em] text-fog transition-colors group-hover:text-amber">
+              by AliceLabs
+            </span>
           </span>
         </button>
         <nav className="hidden items-center gap-6 lg:flex">
@@ -250,7 +255,7 @@ function Opening({ onPlayDemo }: { onPlayDemo: () => void }) {
           <Reveal>
             <div className="hud-corners mb-8 inline-block border border-line bg-panel/70 px-4 py-2.5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-fog">
-                Doc de diseño · <span className="text-cyan">temporada 2026</span> · Roblox Studio
+                GameLab <span className="text-amber">by AliceLabs</span> · <span className="text-cyan">temporada 2026</span> · Roblox Studio
               </p>
             </div>
           </Reveal>
@@ -869,12 +874,18 @@ function Footer() {
   return (
     <footer className="border-t border-line bg-deep/80">
       <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 px-4 py-10 md:flex-row md:items-center md:px-8">
-        <div className="flex items-center gap-2.5">
-          <IconCube className="h-5 w-5 text-cyan" />
-          <span className="font-display text-xs text-paper">
-            GAME<span className="text-amber">LAB</span>
-          </span>
-          <span className="ml-3 text-xs text-fog">Roblox Game Lab · v4.1 · 2026</span>
+        <div>
+          <div className="flex items-center gap-2.5">
+            <IconCube className="h-5 w-5 text-cyan" />
+            <span className="font-display text-xs text-paper">
+              GAME<span className="text-amber">LAB</span>
+              <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.28em] text-fog">by AliceLabs</span>
+            </span>
+            <span className="ml-3 text-xs text-fog">v4.1 · 2026</span>
+          </div>
+          <p className="mt-2.5 text-[11px] font-bold uppercase tracking-[0.2em] text-amber">
+            © 2026 AliceLabs LLC · Licencia AliceLabs LLC · Todos los derechos reservados
+          </p>
         </div>
         <p className="max-w-md text-xs leading-relaxed text-fog">
           Documento conceptual no oficial, sin afiliación con Roblox Corporation.

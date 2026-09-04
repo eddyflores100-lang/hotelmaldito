@@ -1,17 +1,17 @@
 <div align="center">
 
-# 🎮 Roblox Game Lab
+# 🎮 GameLab by AliceLabs
 
-### Hotel ∞ Infinito — GDD completo + 3 conceptos de juego para Roblox
+### Hotel ∞ Infinito — GDD completo + demo jugable 3D · Un proyecto de AliceLabs LLC
 
-*Sitio interactivo de investigación y diseño: radiografía del mercado Roblox 2025, tres conceptos jugables en nichos vacíos, GDD completo del proyecto estrella, roadmap de producción y código Luau de referencia.*
+*GameLab by AliceLabs: sitio interactivo de investigación y diseño — radiografía del mercado Roblox 2025, tres conceptos jugables en nichos vacíos, GDD completo del proyecto estrella, roadmap de producción y código Luau de referencia.*
 
 [![CI](https://github.com/eddyflores100-lang/hotelmaldito/actions/workflows/ci.yml/badge.svg)](https://github.com/eddyflores100-lang/hotelmaldito/actions/workflows/ci.yml)
 [![Deploy Pages](https://github.com/eddyflores100-lang/hotelmaldito/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/eddyflores100-lang/hotelmaldito/actions/workflows/deploy-pages.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
-[![License](https://img.shields.io/badge/Licencia-Apache--2.0-C9A227)](LICENSE)
+[![License](https://img.shields.io/badge/Licencia-AliceLabs_LLC-C9A227)](LICENSE)
 
 **🌐 Ver demo en vivo → [eddyflores100-lang.github.io/hotelmaldito](https://eddyflores100-lang.github.io/hotelmaldito/)**
 
@@ -49,7 +49,7 @@
 
 ## 📖 Sobre el proyecto
 
-**Roblox Game Lab** es un documento interactivo de preproducción para crear juegos *únicos para niños y adolescentes en Roblox*. En lugar de copiar fórmulas de moda, este laboratorio analiza los datos reales del mercado (Q3–Q4 2025), identifica **nichos vacíos** y propone tres conceptos completos con su loop de juego, escenarios, monetización y referencias.
+**GameLab by AliceLabs** es el laboratorio de preproducción de AliceLabs LLC para crear juegos *únicos para niños y adolescentes en Roblox*. En lugar de copiar fórmulas de moda, este laboratorio analiza los datos reales del mercado (Q3–Q4 2025), identifica **nichos vacíos** y propone tres conceptos completos con su loop de juego, escenarios, monetización y referencias.
 
 El concepto ganador — **Hotel ∞ Infinito**, terror cómico cooperativo con pisos procedurales infinitos — cuenta con un **GDD (Game Design Document) completo**: pilares de diseño, roles jugables, economía de propinas, generador de pisos, integración técnica en Roblox Studio y plan de live-ops.
 
@@ -176,10 +176,10 @@ Consulta [CONTRIBUTING.md](CONTRIBUTING.md) para las convenciones de commits y e
 
 ## 📄 Licencia
 
-Distribuido bajo la [Licencia Apache 2.0](LICENSE).
+© 2026 **AliceLabs LLC**. Todos los derechos reservados — distribuido bajo la [Licencia AliceLabs LLC](LICENSE) (propietaria). Uso, copia o redistribución no autorizados prohibidos.
 
 ---
 
 <div align="center">
-<sub>Hecho con 🧡 y mucho café de madrugada · turno de noche en el Hotel ∞</sub>
+<sub>GameLab by AliceLabs · © 2026 AliceLabs LLC · Hecho con 🧡 y mucho café de madrugada · turno de noche en el Hotel ∞</sub>
 </div>

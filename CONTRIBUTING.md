@@ -1,6 +1,6 @@
 # Guía de contribución
 
-Gracias por tu interés en **Roblox Game Lab**. Este documento define las normas para proponer cambios al GDD, a los conceptos de juego o al sitio.
+Gracias por tu interés en **GameLab by AliceLabs**. Este documento define las normas para proponer cambios al GDD, a los conceptos de juego o al sitio.
 
 ## 🧭 Filosofía del contenido
 

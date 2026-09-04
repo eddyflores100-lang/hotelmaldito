@@ -345,7 +345,10 @@ export default function Game3D() {
       {showIntro && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-gradient-to-b from-[#070d18ee] via-[#0a1220dd] to-[#070d18f5] p-4">
           <div className="max-w-lg text-center">
-            <div className="font-display text-4xl sm:text-5xl leading-none" style={{ color: HEX.gold }}>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-[#8fa3c4]">
+              GameLab <span style={{ color: HEX.lime }}>by AliceLabs</span> presenta
+            </p>
+            <div className="mt-2 font-display text-4xl sm:text-5xl leading-none" style={{ color: HEX.gold }}>
               HOTEL ∞
             </div>
             <div className="mt-1 font-display text-xl sm:text-2xl" style={{ color: HEX.red }}>
