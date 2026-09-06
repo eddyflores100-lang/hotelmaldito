@@ -82,6 +82,7 @@ export type SpaceHud = {
   maxO2: number;
   hp: number;
   metal: number;
+  deaths: number;
   totalMetal: number;
   record: number;
   recordSector: number;
@@ -182,6 +183,7 @@ export class SpaceGame {
   private o2 = 100;
   private maxO2 = 100;
   private hp = 100;
+  private deaths = 0;
   private tool: Tool = "magnet";
   private toolMeshes: Record<Tool, THREE.Group | null> = { magnet: null, blaster: null, wrench: null };
   private swingT = 0;
@@ -1212,9 +1214,9 @@ export class SpaceGame {
         this.jumpT = -1;
       }
       if (this.player.position.y < -14) {
-        /* rescate de caída: el jetpack se enciende solo */
-        this.mode = "fly";
-        this.pVel.set(0, 6, 0);
+        /* el vacío MATA si caminas sin jetpack: deberías haber mantenido
+           ESPACIO para activar la mochila cohete y volar de vuelta */
+        this.dieInVoid();
       }
       if (this.jetGlow) this.jetGlow.visible = false;
       this.thrustGlow && (this.thrustGlow.visible = false);
@@ -1304,6 +1306,29 @@ export class SpaceGame {
     this.metal -= loss;
     this.audio.rescue();
     this.cb.onToast(msg + (loss > 0 ? ` (−${loss} ✦)` : ""), "bad");
+  }
+
+  /* muerte real: caíste al vacío sin jetpack — respawn en el hangar */
+  private dieInVoid() {
+    this.deaths++;
+    const loss = Math.floor(this.metal * 0.25);
+    this.metal -= loss;
+    this.o2 = this.maxO2;
+    this.hp = 100;
+    this.releaseAll();
+    this.player.position.set(2.8, -1.02, 5.8);
+    this.pVel.set(0, 0, 0);
+    this.mode = "walk";
+    this.jumpT = -1;
+    this.onGround = true;
+    this.hurtFlash = 3;
+    this.audio.damage();
+    this.audio.rescue();
+    this.cb.onToast(
+      "☠ HAS CAÍDO AL VACÍO" + (loss > 0 ? ` (−${loss} ✦)` : "") +
+      " · salta y mantén ESPACIO para volar con la mochila cohete",
+      "bad"
+    );
   }
 
   /* -------------------------- armas ----------------------------------- */
@@ -2170,6 +2195,7 @@ export class SpaceGame {
       maxO2: this.maxO2,
       hp: Math.max(0, Math.round(this.hp)),
       metal: Math.floor(this.metal),
+      deaths: this.deaths,
       totalMetal: Math.floor(this.totalMetal),
       record: this.record,
       recordSector: this.recordSector,

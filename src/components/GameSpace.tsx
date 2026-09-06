@@ -4,7 +4,7 @@
    GameLab by AliceLabs
    ============================================================ */
 import { useEffect, useRef, useState } from "react";
-import { Anchor, Cog, Crosshair, Gem, Hash, Heart, Magnet, Pause, Play, Radio, Shield, Sun, Swords, Volume2, VolumeX, Wrench, X, Zap } from "lucide-react";
+import { Anchor, Cog, Crosshair, Gem, Hash, Heart, Magnet, Pause, Play, Radio, Shield, Skull, Sun, Swords, Volume2, VolumeX, Wrench, X, Zap } from "lucide-react";
 import { SpaceGame, MODULE_INFO, SECTORS, TOOL_INFO, type ModuleType, type SpaceHud, type Tool } from "../games/space/SpaceGame";
 
 type Toast = { id: number; msg: string; kind: "ok" | "bad" | "info" };
@@ -253,6 +253,11 @@ export default function GameSpace({ onExit }: { onExit?: () => void }) {
                 <span className="flex items-center gap-1 font-display text-[11px] text-[#38e1d4]">
                   <Magnet size={12} /> {hud?.towing ?? 0}/2
                 </span>
+                {(hud?.deaths ?? 0) > 0 && (
+                  <span className="flex items-center gap-1 font-display text-[11px] text-[#ff6b5e]">
+                    <Skull size={12} /> {hud?.deaths ?? 0}
+                  </span>
+                )}
               </div>
             </div>
             {/* misiones */}
