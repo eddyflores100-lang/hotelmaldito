@@ -4,15 +4,42 @@
    ============================================================ */
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { AntAudio, TAU, rand, clamp, lerp, soilTexture, moundTexture, skyTexture, labelSprite, dotTexture } from "./util";
+import { Avatar } from "../../game/avatar";
+import { STUD } from "../../game/util";
+import { AntAudio, TAU, rand, clamp, lerp, soilTexture, skyTexture, moundTexture, labelSprite, dotTexture } from "./util";
 
 export type ChamberKind = "criadero" | "granero" | "hongo" | "real";
 export const CHAMBER_INFO: Record<ChamberKind, { name: string; cost: number; desc: string }> = {
-  criadero: { name: "CRIADERO", cost: 30, desc: "permite criar obreras" },
+  criadero: { name: "CRIADERO", cost: 30, desc: "permite criar obreras y huevos" },
   granero: { name: "GRANERO", cost: 30, desc: "+25% comida al depositar" },
   hongo: { name: "HUERTO DE HONGOS", cost: 45, desc: "siembra: +1 🍃 cada 8 s" },
   real: { name: "SALA REAL", cost: 60, desc: "Reina +50 HP y se cura" },
 };
+
+/* ----------------------------- JARDINES ----------------------------- */
+export type GardenDef = {
+  name: string;
+  sub: string;
+  soil: [string, string];
+  sky: [string, string, string, string];
+  fog: string;
+  grassHue: [number, number];
+  grassLight: [number, number];
+  petals: number[];
+  stone: number;
+  enemyMult: number;
+  speedMult: number;
+  foodGoal: number;
+  waveGoal: number;
+  boss: "mantis" | "scorpion" | null;
+};
+export const GARDENS: GardenDef[] = [
+  { name: "JARDÍN 1", sub: "Patio Trasero",     soil: ["#8a6a42", ""],        sky: ["#4da3e8", "#a8d8f0", "#d8ecd8", "#b7d489"], fog: "#a8d8f0", grassHue: [0.24, 0.3],  grassLight: [0.32, 0.45], petals: [0xff8ac2, 0xffd23e, 0xff6a4e, 0xb48aff], stone: 0x9aa0a6, enemyMult: 1,    speedMult: 1,    foodGoal: 60,  waveGoal: 2, boss: null },
+  { name: "JARDÍN 2", sub: "Pradera Silvestre", soil: ["#96774a", "x"],        sky: ["#5ab88a", "#9be0a8", "#d8ffd8", "#a8e88a"], fog: "#b8e8c0", grassHue: [0.22, 0.28], grassLight: [0.36, 0.5],  petals: [0xffd23e, 0xff8ac2, 0xff9a4e, 0xd8ff6a], stone: 0xa8b09a, enemyMult: 1.3,  speedMult: 1.06, foodGoal: 130, waveGoal: 3, boss: null },
+  { name: "JARDÍN 3", sub: "Bosque Profundo",   soil: ["#5c4a30", "x"],        sky: ["#2a5a3e", "#4a7a5a", "#8fbf98", "#6a9a72"], fog: "#5a8a68", grassHue: [0.3, 0.38],  grassLight: [0.22, 0.34], petals: [0xb48aff, 0x6affc9, 0xff8ac2, 0xd8b4ff], stone: 0x7a8a76, enemyMult: 1.65, speedMult: 1.12, foodGoal: 220, waveGoal: 3, boss: "mantis" },
+  { name: "JARDÍN 4", sub: "Desierto Escarlata", soil: ["#c49a5e", "x"],       sky: ["#e8884e", "#ffb88a", "#ffe6c9", "#e8c9a0"], fog: "#e8c9a0", grassHue: [0.13, 0.18], grassLight: [0.4, 0.55],  petals: [0xff6a4e, 0xffd23e, 0xff8a4e, 0xffa04e], stone: 0xc9a878, enemyMult: 2.05, speedMult: 1.18, foodGoal: 320, waveGoal: 4, boss: "scorpion" },
+  { name: "JARDÍN 5", sub: "Terrario Infinito", soil: ["#6a4a6a", "x"],        sky: ["#4a2a7a", "#7a5aaa", "#c9a8ff", "#8a6ab8"], fog: "#8a6ab8", grassHue: [0.78, 0.86], grassLight: [0.3, 0.45],  petals: [0xff5ad8, 0x6affff, 0xffd23e, 0xb48aff], stone: 0x8a7a9a, enemyMult: 2.5,  speedMult: 1.24, foodGoal: Infinity, waveGoal: Infinity, boss: null },
+];
 
 export type AntHud = {
   phase: "intro" | "playing";
@@ -38,7 +65,13 @@ export type AntHud = {
   legend: boolean;
   over: boolean;
   stats: { wave: number; food: number; kills: number };
-  minimap: { px: number; pz: number; items: number[]; enemies: number[] };
+  garden: number;
+  gardenName: string;
+  gardenSub: string;
+  portal: { ready: boolean; food: number; foodGoal: number; waves: number; wavesGoal: number };
+  boss: { hp: number; max: number; name: string } | null;
+  eggs: number;
+  minimap: { px: number; pz: number; items: number[]; enemies: number[]; portal: [number, number] | null };
 };
 
 export type AntCallbacks = {
@@ -50,7 +83,7 @@ export type AntCallbacks = {
 type ItemKind = "crumb" | "dew" | "seed";
 type Item = { mesh: THREE.Object3D; kind: ItemKind; taken: boolean; respawnAt: number };
 type Aphid = { mesh: THREE.Mesh; ready: boolean; timer: number };
-type EnemyKind = "ant" | "wasp" | "spider";
+type EnemyKind = "ant" | "wasp" | "spider" | "beetle" | "mantis" | "scorpion";
 type Enemy = {
   mesh: THREE.Group;
   kind: EnemyKind;
@@ -62,8 +95,12 @@ type Enemy = {
   alive: boolean;
   bar: THREE.Mesh;
   phase: number;
+  elite: boolean;
+  boss: boolean;
   target: "mound" | "player" | "steal" | "flee";
 };
+type Egg = { mesh: THREE.Group; timer: number; caste: "worker" | "soldier" };
+type Stud = { mesh: THREE.Mesh; respawnAt: number };
 type P = { vx: number; vy: number; vz: number; life: number };
 
 const ITEM_VALUE: Record<ItemKind, number> = { crumb: 5, dew: 8, seed: 10 };
@@ -91,9 +128,11 @@ export class AntGame {
 
   /* jugador */
   private player = new THREE.Group();
+  private avatar: Avatar | null = null;
+  private antennae: THREE.Object3D[] = [];
   private pVel = new THREE.Vector3();
-  private pYaw = Math.PI;
-  private camYaw = Math.PI;
+  private pYaw = 0;
+  private camYaw = 0;
   private camPitch = 0.32;
   private camDist = 9;
   private keys: Record<string, boolean> = {};
@@ -119,8 +158,23 @@ export class AntGame {
   private chambers: Map<ChamberKind, { x: number; z: number; built: boolean; group: THREE.Group | null; ring: THREE.Mesh; seeded: boolean }> = new Map();
   private digProgress = 0;
   private digTarget: ChamberKind | "afido" | null = null;
+  private warpFx = 0;
   private mushTimer = 0;
-  private upLevels = [0, 0, 0];
+  private upLevels = [0, 0, 0, 0, 0, 0];
+
+  /* jardín actual (nivel) */
+  private garden = 0;
+  private gardenFood = 0;
+  private gardenWaves = 0;
+  private gardenBossSpawned = false;
+  private decorGroup: THREE.Group | null = null;
+  private groundMat: THREE.MeshStandardMaterial | null = null;
+  private grassInst: THREE.InstancedMesh | null = null;
+  private portal: THREE.Group | null = null;
+  private portalRing: THREE.Mesh | null = null;
+  private portalLabel: THREE.Sprite | null = null;
+  private eggs: Egg[] = [];
+  private studs: Stud[] = [];
 
   /* oleadas */
   private wave = 0;
@@ -137,7 +191,7 @@ export class AntGame {
   private drops: { mesh: THREE.Mesh; ring: THREE.Mesh; target: THREE.Vector3; warn: number; falling: boolean }[] = [];
 
   /* misiones */
-  private counters = { deposited: 0, chambers: 0, kills: 0, milked: 0, bred: 0, waves: 0 };
+  private counters = { deposited: 0, chambers: 0, kills: 0, milked: 0, bred: 0, waves: 0, gardens: 0, beetles: 0 };
   private missionIdx = [0, 1, 2];
   private missionPool = [
     { text: "Deposita comida en el hormiguero", goal: 6, reward: 15, key: "deposited" as const },
@@ -146,6 +200,8 @@ export class AntGame {
     { text: "Ordeña áfidos", goal: 2, reward: 15, key: "milked" as const },
     { text: "Cría hormigas", goal: 2, reward: 20, key: "bred" as const },
     { text: "Sobrevive oleadas", goal: 2, reward: 30, key: "waves" as const },
+    { text: "Migra a un nuevo jardín", goal: 1, reward: 40, key: "gardens" as const },
+    { text: "Derrota escarabajos", goal: 3, reward: 30, key: "beetles" as const },
   ];
   private missionBase = [0, 0, 0];
 
@@ -194,7 +250,10 @@ export class AntGame {
     this.buildNest();
     this.buildChamberSpots();
     this.buildItems();
+    this.buildPortal();
+    this.buildStuds();
     this.buildPlayer();
+    this.applyGardenTheme();
 
     /* lluvia: gotas + avisos */
     const dropGeo = new THREE.SphereGeometry(1.1, 12, 10);
@@ -241,6 +300,7 @@ export class AntGame {
       new THREE.MeshStandardMaterial({ map: soilTexture(), roughness: 1 })
     );
     ground.rotation.x = -Math.PI / 2;
+    this.groundMat = ground.material as THREE.MeshStandardMaterial;
     this.scene.add(ground);
 
     /* hierba: matas de conos (instanciado) */
@@ -273,55 +333,13 @@ export class AntGame {
       }
     }
     inst.count = idx;
+    this.grassInst = inst;
     this.scene.add(inst);
 
-    /* guijarros y palos */
-    const stoneMat = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.9 });
-    for (let i = 0; i < 9; i++) {
-      const s = new THREE.Mesh(new THREE.SphereGeometry(rand(0.8, 1.7), 10, 8), stoneMat);
-      s.scale.y = 0.55;
-      const a = rand(0, TAU);
-      const r = rand(14, 46);
-      s.position.set(Math.cos(a) * r, 0.35, Math.sin(a) * r);
-      this.scene.add(s);
-    }
-    const stickMat = new THREE.MeshStandardMaterial({ color: 0x7a5636, roughness: 0.9 });
-    for (let i = 0; i < 4; i++) {
-      const st = new THREE.Mesh(new THREE.CylinderGeometry(rand(0.16, 0.3), rand(0.22, 0.38), rand(4, 8), 7), stickMat);
-      st.rotation.z = Math.PI / 2;
-      st.rotation.y = rand(0, TAU);
-      const a = rand(0, TAU);
-      const r = rand(16, 44);
-      st.position.set(Math.cos(a) * r, 0.3, Math.sin(a) * r);
-      this.scene.add(st);
-    }
+    this.buildDecor();
 
-    /* flores decorativas */
+    /* tallo con pulgones (permanente) */
     const stemMat = new THREE.MeshStandardMaterial({ color: 0x4c9a3f, roughness: 0.9 });
-    const petalCols = [0xff8ac2, 0xffd23e, 0xff6a4e, 0xb48aff];
-    for (let i = 0; i < 8; i++) {
-      const a = rand(0, TAU);
-      const r = rand(18, 46);
-      const fx = Math.cos(a) * r;
-      const fz = Math.sin(a) * r;
-      const h = rand(2.2, 3.6);
-      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, h, 6), stemMat);
-      stem.position.set(fx, h / 2, fz);
-      this.scene.add(stem);
-      const pm = new THREE.MeshStandardMaterial({ color: petalCols[i % 4], roughness: 0.7 });
-      for (let p = 0; p < 5; p++) {
-        const petal = new THREE.Mesh(new THREE.SphereGeometry(0.34, 8, 6), pm);
-        petal.scale.set(1, 0.4, 0.65);
-        const pa = (p / 5) * TAU;
-        petal.position.set(fx + Math.cos(pa) * 0.42, h, fz + Math.sin(pa) * 0.42);
-        this.scene.add(petal);
-      }
-      const heart = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), new THREE.MeshStandardMaterial({ color: 0xffe9a8, roughness: 0.6 }));
-      heart.position.set(fx, h + 0.1, fz);
-      this.scene.add(heart);
-    }
-
-    /* tallo con pulgones */
     const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 6.5, 7), stemMat);
     stalk.position.set(-24, 3.25, -6);
     this.scene.add(stalk);
@@ -349,6 +367,91 @@ export class AntGame {
     }
   }
 
+  /** decoración recolorizable por jardín (piedras, palos, flores) */
+  private buildDecor() {
+    const G = GARDENS[this.garden];
+    const grp = new THREE.Group();
+    /* guijarros y palos */
+    const stoneMat = new THREE.MeshStandardMaterial({ color: G.stone, roughness: 0.9 });
+    for (let i = 0; i < 9; i++) {
+      const s = new THREE.Mesh(new THREE.SphereGeometry(rand(0.8, 1.7), 10, 8), stoneMat);
+      s.scale.y = 0.55;
+      const a = rand(0, TAU);
+      const r = rand(14, 46);
+      s.position.set(Math.cos(a) * r, 0.35, Math.sin(a) * r);
+      grp.add(s);
+    }
+    const stickMat = new THREE.MeshStandardMaterial({ color: 0x7a5636, roughness: 0.9 });
+    for (let i = 0; i < 4; i++) {
+      const st = new THREE.Mesh(new THREE.CylinderGeometry(rand(0.16, 0.3), rand(0.22, 0.38), rand(4, 8), 7), stickMat);
+      st.rotation.z = Math.PI / 2;
+      st.rotation.y = rand(0, TAU);
+      const a = rand(0, TAU);
+      const r = rand(16, 44);
+      st.position.set(Math.cos(a) * r, 0.3, Math.sin(a) * r);
+      grp.add(st);
+    }
+    /* flores decorativas con paleta del jardín */
+    const stemMat = new THREE.MeshStandardMaterial({ color: 0x4c9a3f, roughness: 0.9 });
+    const petalCols = G.petals;
+    for (let i = 0; i < 10; i++) {
+      const a = rand(0, TAU);
+      const r = rand(18, 46);
+      const fx = Math.cos(a) * r;
+      const fz = Math.sin(a) * r;
+      const h = rand(2.2, 3.6);
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, h, 6), stemMat);
+      stem.position.set(fx, h / 2, fz);
+      grp.add(stem);
+      const pm = new THREE.MeshStandardMaterial({ color: petalCols[i % petalCols.length], roughness: 0.7 });
+      for (let p = 0; p < 5; p++) {
+        const petal = new THREE.Mesh(new THREE.SphereGeometry(0.34, 8, 6), pm);
+        petal.scale.set(1, 0.4, 0.65);
+        const pa = (p / 5) * TAU;
+        petal.position.set(fx + Math.cos(pa) * 0.42, h, fz + Math.sin(pa) * 0.42);
+        grp.add(petal);
+      }
+      const heart = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), new THREE.MeshStandardMaterial({ color: 0xffe9a8, roughness: 0.6 }));
+      heart.position.set(fx, h + 0.1, fz);
+      grp.add(heart);
+    }
+    this.decorGroup = grp;
+    this.scene.add(grp);
+  }
+
+  /** aplica la paleta del jardín actual: suelo, cielo, niebla, decor */
+  private applyGardenTheme() {
+    const G = GARDENS[this.garden];
+    if (this.groundMat) {
+      const old = this.groundMat.map;
+      this.groundMat.map = soilTexture(G.soil[0], G.soil[1]);
+      this.groundMat.needsUpdate = true;
+      old?.dispose();
+    }
+    const oldBg = this.scene.background as THREE.Texture | null;
+    this.scene.background = skyTexture(G.sky[0], G.sky[1], G.sky[2], G.sky[3]);
+    if (oldBg && oldBg.isTexture) oldBg.dispose();
+    (this.scene.fog as THREE.Fog).color.set(G.fog);
+    /* recolorear hierba */
+    if (this.grassInst) {
+      const col = new THREE.Color();
+      for (let i = 0; i < this.grassInst.count; i++) {
+        col.setHSL(rand(G.grassHue[0], G.grassHue[1]), rand(0.55, 0.75), rand(G.grassLight[0], G.grassLight[1]));
+        this.grassInst.setColorAt(i, col);
+      }
+      if (this.grassInst.instanceColor) this.grassInst.instanceColor.needsUpdate = true;
+    }
+    /* reconstruir decor */
+    if (this.decorGroup) {
+      this.scene.remove(this.decorGroup);
+      this.decorGroup.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.geometry) m.geometry.dispose();
+      });
+    }
+    this.buildDecor();
+  }
+
   private buildNest() {
     const mound = new THREE.Mesh(
       new THREE.ConeGeometry(4.4, 2.6, 20),
@@ -371,7 +474,8 @@ export class AntGame {
     ring.position.set(this.depositPos.x, 0.07, this.depositPos.z);
     this.scene.add(ring);
     const lbl = labelSprite("HORMIGUERO");
-    lbl.position.set(this.moundPos.x, 4.6, this.moundPos.z);
+    lbl.position.set(this.moundPos.x, 5.6, this.moundPos.z);
+    lbl.scale.set(3.6, 0.9, 1);
     this.scene.add(lbl);
   }
 
@@ -542,20 +646,252 @@ export class AntGame {
   }
 
   private buildPlayer() {
-    const { group, legs, mandibles } = this.buildAntBody(1.05, 0xb3541e, 0xa8e63c, true);
-    this.player = group;
-    this.legs = legs;
-    this.mandibles = mandibles;
+    /* avatar R6 hormiga: casco de obra amarillo + cuerpo castaño + antenas */
+    const SCALE = 0.62;
+    const avatar = new Avatar({
+      skin: "#b3541e", torso: "#b3541e", arms: "#8a3c14", legs: "#5c2e10",
+      face: "happy", hat: "cap", hatColor: "#f4c542",
+    });
+    avatar.group.rotation.y = Math.PI; // mira hacia -z (convención del juego)
+    avatar.group.scale.setScalar(SCALE);
+    const inner = new THREE.Group();
+    inner.add(avatar.group);
+    /* antenas en la cabeza */
+    const headY = 2.46 * STUD * SCALE;
+    const antMat = new THREE.MeshStandardMaterial({ color: 0x241812, roughness: 0.6 });
+    this.antennae = [];
+    for (const sx of [-0.05, 0.05]) {
+      const ant = new THREE.Mesh(new THREE.CapsuleGeometry(0.016, 0.26, 3, 6), antMat);
+      ant.position.set(sx, headY + 0.14, -0.02);
+      ant.rotation.x = -0.7;
+      inner.add(ant);
+      this.antennae.push(ant);
+    }
+    /* mandíbulas delante (anima el mordisco) */
+    this.mandibles = [];
+    const mandMat = new THREE.MeshStandardMaterial({ color: 0xa8e63c, roughness: 0.4 });
+    for (const sx of [-1, 1]) {
+      const piv = new THREE.Group();
+      piv.position.set(sx * 0.1, 1.62 * SCALE + 0.28, -0.26);
+      const m = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.2, 6), mandMat);
+      m.rotation.x = -Math.PI / 2;
+      m.position.z = -0.1;
+      piv.add(m);
+      piv.rotation.y = sx * 0.4;
+      inner.add(piv);
+      this.mandibles.push(piv);
+    }
+    /* abdomen detrás */
+    const abdomen = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10),
+      new THREE.MeshStandardMaterial({ color: 0x8a3c14, roughness: 0.55 }));
+    abdomen.position.set(0, 1.05 * SCALE + 0.3, 0.3);
+    abdomen.scale.set(1, 0.9, 1.3);
+    inner.add(abdomen);
     /* carga visual: 2 slots sobre la espalda */
     for (let i = 0; i < 2; i++) {
       const holder = new THREE.Group();
-      holder.position.set(0, 1.15 + i * 0.42, 0.62);
+      holder.position.set(0, 0.95 + i * 0.28, 0.42);
       holder.visible = false;
-      group.add(holder);
+      inner.add(holder);
       this.carryMeshes.push(holder);
     }
+    this.avatar = avatar;
+    this.player = inner;
     this.player.position.set(0, 0, 8);
     this.scene.add(this.player);
+  }
+
+  /** arco-portal de hojas al siguiente jardín */
+  private buildPortal() {
+    const g = new THREE.Group();
+    const arch = new THREE.Mesh(
+      new THREE.TorusGeometry(2.6, 0.28, 8, 24, Math.PI),
+      new THREE.MeshStandardMaterial({ color: 0x4c9a3f, roughness: 0.8 })
+    );
+    arch.position.y = 0;
+    g.add(arch);
+    this.portalRing = new THREE.Mesh(
+      new THREE.CircleGeometry(2.3, 24),
+      new THREE.MeshBasicMaterial({ color: 0xa8e63c, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false })
+    );
+    g.add(this.portalRing);
+    for (const sx of [-2.6, 2.6]) {
+      const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6),
+        new THREE.MeshStandardMaterial({ color: 0x6ab84e, roughness: 0.7 }));
+      leaf.scale.set(1, 1.5, 0.5);
+      leaf.position.set(sx, 1.4, 0);
+      g.add(leaf);
+    }
+    const lbl = labelSprite("MIGRAR JARDÍN [E]", "#a8e63c");
+    lbl.position.set(0, 3.6, 0);
+    g.add(lbl);
+    this.portalLabel = lbl;
+    g.position.set(0, 0, -30);
+    this.scene.add(g);
+    this.portal = g;
+  }
+
+  /** gotas de miel doradas estilo studs */
+  private buildStuds() {
+    for (const s of this.studs) this.scene.remove(s.mesh);
+    this.studs = [];
+    const geo = new THREE.SphereGeometry(0.3, 10, 8);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffb347, emissive: 0x9a5a10, emissiveIntensity: 0.7, roughness: 0.25 });
+    for (let i = 0; i < 10; i++) {
+      const mesh = new THREE.Mesh(geo, mat);
+      const a = rand(0, TAU);
+      const r = rand(9, 38);
+      mesh.position.set(Math.cos(a) * r, 0.6, Math.sin(a) * r);
+      this.scene.add(mesh);
+      this.studs.push({ mesh, respawnAt: 0 });
+    }
+  }
+
+  /** meta del jardín completada → portal abierto */
+  private portalReady(): boolean {
+    const G = GARDENS[this.garden];
+    if (this.garden >= GARDENS.length - 1) return false;
+    return this.gardenFood >= G.foodGoal && this.gardenWaves >= G.waveGoal;
+  }
+
+  private updatePortal(dt: number) {
+    if (!this.portal || !this.portalRing) return;
+    const ready = this.portalReady();
+    const t = this.clock.elapsedTime;
+    this.portalRing.material = (this.portalRing.material as THREE.MeshBasicMaterial).clone();
+    (this.portalRing.material as THREE.MeshBasicMaterial).opacity = ready ? 0.3 + Math.sin(t * 5) * 0.18 : 0.12;
+    (this.portalRing.material as THREE.MeshBasicMaterial).color.setHex(ready ? 0xd8ff6a : 0xa8e63c);
+    if (this.portalLabel) {
+      (this.portalLabel.material as THREE.SpriteMaterial).opacity = ready ? 0.95 : 0.4;
+    }
+    if (ready && Math.hypot(this.player.position.x, this.player.position.z + 30) < 3.6) {
+      this.warpFx += dt;
+      if (this.warpFx > 0.4) this.migrate();
+    } else this.warpFx = Math.max(0, this.warpFx - dt);
+    void dt;
+  }
+
+  /** migración de la colonia al siguiente jardín */
+  private migrate() {
+    this.warpFx = 0;
+    this.garden++;
+    this.counters.gardens++;
+    const G = GARDENS[this.garden];
+    this.gardenFood = 0;
+    this.gardenWaves = 0;
+    this.gardenBossSpawned = false;
+    this.applyGardenTheme();
+    /* limpiar enemigos */
+    for (const e of this.enemies) if (e.alive) this.scene.remove(e.mesh);
+    this.enemies = [];
+    this.wave = 0;
+    this.waveState = "calm";
+    this.waveTimer = 45;
+    /* renovar comida */
+    for (const it of this.items) {
+      it.taken = false;
+      it.mesh.visible = true;
+      const a = rand(0, TAU);
+      const r = rand(8, 38);
+      it.mesh.position.set(Math.cos(a) * r, 0.5, Math.sin(a) * r);
+    }
+    for (const s of this.studs) {
+      s.mesh.visible = true;
+      const a = rand(0, TAU);
+      const r = rand(9, 38);
+      s.mesh.position.set(Math.cos(a) * r, 0.6, Math.sin(a) * r);
+    }
+    this.food += 25;
+    this.player.position.set(0, 0, 2);
+    this.pVel.set(0, 0, 0);
+    this.camYaw = 0;
+    this.record = Math.max(this.record, this.garden);
+    localStorage.setItem("hormiguero_record", String(Math.max(this.record, this.wavesSurvived)));
+    this.burst(this.player.position.clone().setY(1), 0xd8ff6a, 24, 4);
+    this.audio.legend();
+    this.cb.onBanner(`🌿 ${G.name}: ${G.sub}`, "+25 🍃 de viaje · nuevas oleadas y enemigos te esperan");
+  }
+
+  private updateStuds(dt: number) {
+    const t = this.clock.elapsedTime;
+    for (const s of this.studs) {
+      if (!s.mesh.visible) {
+        if (t > s.respawnAt) {
+          s.mesh.visible = true;
+          const a = rand(0, TAU);
+          const r = rand(9, 38);
+          s.mesh.position.set(Math.cos(a) * r, 0.6, Math.sin(a) * r);
+        }
+        continue;
+      }
+      s.mesh.position.y = 0.6 + Math.sin(t * 3 + s.mesh.position.x) * 0.12;
+      const d = s.mesh.position.distanceTo(this.player.position);
+      if (d < 4) s.mesh.position.lerp(this.player.position.clone().setY(0.6), Math.min(1, dt * 4));
+      if (d < 1.2) {
+        s.mesh.visible = false;
+        s.respawnAt = t + 25;
+        this.food += 3;
+        this.audio.pickup();
+        this.burst(s.mesh.position.clone(), 0xffb347, 6, 2);
+      }
+    }
+  }
+
+  private updateEggs(dt: number) {
+    for (let i = this.eggs.length - 1; i >= 0; i--) {
+      const egg = this.eggs[i];
+      egg.timer -= dt;
+      egg.mesh.rotation.z = Math.sin(this.clock.elapsedTime * 8) * 0.12;
+      egg.mesh.position.y = 0.45 + Math.sin(this.clock.elapsedTime * 6) * 0.05;
+      if (egg.timer <= 0) {
+        this.scene.remove(egg.mesh);
+        this.eggs.splice(i, 1);
+        if (egg.caste === "worker") {
+          this.workers.push(this.makeWorker());
+          this.cb.onToast("🐜 ¡Ha nacido una OBRERA!", "ok");
+        } else {
+          this.soldiers.push(this.makeSoldier());
+          this.cb.onToast("⚔ ¡Ha nacido un SOLDADO!", "ok");
+        }
+        this.counters.bred++;
+        this.audio.breed();
+        this.burst(egg.mesh.position.clone(), 0xd8b4ff, 10, 2.6);
+      }
+    }
+  }
+
+  /** compra un huevo (ecolona al eclosionar) */
+  buyEgg(caste: "worker" | "soldier"): boolean {
+    if (!this.chambers.get("criadero")!.built) {
+      this.cb.onToast("Necesitas excavar el CRIADERO", "bad");
+      return false;
+    }
+    if (caste === "worker" && this.workers.length + this.eggs.filter((e) => e.caste === "worker").length >= 8) {
+      this.cb.onToast("Colmena de obreras llena (8)", "bad");
+      return false;
+    }
+    if (caste === "soldier" && this.soldiers.length + this.eggs.filter((e) => e.caste === "soldier").length >= 4) {
+      this.cb.onToast("Máximo de soldados (4)", "bad");
+      return false;
+    }
+    const cost = caste === "worker" ? 20 : 30;
+    if (this.food < cost) {
+      this.cb.onToast(`Faltan 🍃 (${cost})`, "bad");
+      return false;
+    }
+    this.food -= cost;
+    /* huevo visible junto al hormiguero */
+    const g = new THREE.Group();
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 10),
+      new THREE.MeshStandardMaterial({ color: caste === "worker" ? 0xd8b4ff : 0xffd23e, roughness: 0.4 }));
+    shell.scale.y = 1.25;
+    g.add(shell);
+    g.position.set(this.moundPos.x + rand(-3, 3), 0.45, this.moundPos.z + rand(-1, 3));
+    this.scene.add(g);
+    this.eggs.push({ mesh: g, timer: 8, caste });
+    this.audio.breed();
+    this.cb.onToast(caste === "worker" ? "Huevo de OBRERA incubándose (8 s)" : "Huevo de SOLDADO incubándose (8 s)", "info");
+    return true;
   }
 
   private makeWorker(): { mesh: THREE.Group; state: "seek" | "return" | "flee"; item: Item | null; legs: THREE.Object3D[] } {
@@ -573,14 +909,14 @@ export class AntGame {
     return { mesh: group, legs, cd: 0 };
   }
 
-  private makeBar(): THREE.Mesh {
+  private makeBar(color = 0xa8e63c): THREE.Mesh {
     const bg = new THREE.Mesh(
       new THREE.PlaneGeometry(1, 0.14),
       new THREE.MeshBasicMaterial({ color: 0x301010, transparent: true, opacity: 0.8, depthWrite: false })
     );
     const fg = new THREE.Mesh(
       new THREE.PlaneGeometry(0.96, 0.09),
-      new THREE.MeshBasicMaterial({ color: 0xa8e63c, depthWrite: false })
+      new THREE.MeshBasicMaterial({ color, depthWrite: false })
     );
     fg.position.z = 0.001;
     bg.add(fg);
@@ -591,15 +927,17 @@ export class AntGame {
 
   private spawnEnemy(kind: EnemyKind) {
     const g = new THREE.Group();
+    const G = GARDENS[this.garden];
+    const elite = this.garden >= 2 && !GARDENS[this.garden].boss && Math.random() < 0.12 || (this.garden >= 2 && Math.random() < 0.1);
     let hp = 45, dmg = 8, speed = 3.1;
     let barY = 1.5;
     if (kind === "ant") {
-      const { group } = this.buildAntBody(0.85, 0x8f1e1e, 0x301010, true);
+      const { group } = this.buildAntBody(0.85, elite ? 0xb8860b : 0x8f1e1e, 0x301010, true);
       g.add(group);
-      hp = 45 + this.wave * 7;
-      speed = 3.1 + this.wave * 0.08;
+      hp = (45 + this.wave * 7) * G.enemyMult * (elite ? 1.8 : 1);
+      speed = (3.1 + this.wave * 0.08) * G.speedMult;
     } else if (kind === "wasp") {
-      const bodyMat = new THREE.MeshStandardMaterial({ color: 0xf4c542, roughness: 0.4 });
+      const bodyMat = new THREE.MeshStandardMaterial({ color: elite ? 0xb8860b : 0xf4c542, roughness: 0.4 });
       const blackMat = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.5 });
       const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), bodyMat);
       body.scale.set(0.8, 0.8, 1.5);
@@ -629,10 +967,117 @@ export class AntGame {
         g.add(wing);
       }
       g.userData.wings = true;
-      hp = 35 + this.wave * 4;
-      dmg = 10;
-      speed = 5;
+      hp = (35 + this.wave * 4) * G.enemyMult * (elite ? 1.8 : 1);
+      dmg = 10 * G.enemyMult;
+      speed = 5 * G.speedMult;
       barY = 1.3;
+    } else if (kind === "beetle") {
+      /* escarabajo acorazado: lento, tanque, caparazón */
+      const shellMat = new THREE.MeshStandardMaterial({ color: elite ? 0xb8860b : 0x2e4a2e, roughness: 0.35, metalness: 0.4 });
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1c2e1c, roughness: 0.6 });
+      const shell = new THREE.Mesh(new THREE.SphereGeometry(0.95, 12, 10), shellMat);
+      shell.scale.set(1, 0.75, 1.3);
+      shell.position.z = 0.3;
+      g.add(shell);
+      const line = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.18, 1.6), bodyMat);
+      line.position.set(0, 0.72, 0.3);
+      g.add(line);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), bodyMat);
+      head.position.z = -0.85;
+      g.add(head);
+      for (const sx of [-0.18, 0.18]) {
+        const horn = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.35, 6), bodyMat);
+        horn.rotation.x = -Math.PI / 2.4;
+        horn.position.set(sx, 0.05, -1.1);
+        g.add(horn);
+      }
+      const legGeo = new THREE.CapsuleGeometry(0.07, 0.55, 3, 6);
+      for (let i = 0; i < 6; i++) {
+        const side = i < 3 ? -1 : 1;
+        const k = i % 3;
+        const leg = new THREE.Mesh(legGeo, bodyMat);
+        leg.position.set(side * 0.8, 0.4, -0.5 + k * 0.55);
+        leg.rotation.z = side * 0.9;
+        g.add(leg);
+      }
+      hp = (140 + this.wave * 14) * G.enemyMult * (elite ? 1.8 : 1);
+      dmg = 12 * G.enemyMult;
+      speed = 1.9 * G.speedMult;
+      barY = 1.5;
+      g.scale.setScalar(0.95);
+    } else if (kind === "mantis") {
+      /* mini-jefe del bosque */
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x5aa03c, roughness: 0.5 });
+      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 1.4, 4, 10), bodyMat);
+      body.rotation.x = Math.PI / 2;
+      body.position.y = 1.1;
+      g.add(body);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.36, 10, 8), bodyMat);
+      head.position.set(0, 1.5, -0.9);
+      g.add(head);
+      const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffd23e, emissive: 0xb8860b, emissiveIntensity: 0.8 });
+      for (const sx of [-0.14, 0.14]) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), eyeMat);
+        eye.position.set(sx, 1.58, -1.18);
+        g.add(eye);
+      }
+      for (const sx of [-1, 1]) {
+        const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 1.2, 3, 6), bodyMat);
+        arm.position.set(sx * 0.55, 1.15, -0.7);
+        arm.rotation.x = -1.1;
+        arm.rotation.z = sx * 0.35;
+        g.add(arm);
+        const spike = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.3, 5), bodyMat);
+        spike.position.set(sx * 0.72, 1.0, -1.5);
+        spike.rotation.x = -1.3;
+        g.add(spike);
+      }
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.05, 1.5),
+        new THREE.MeshStandardMaterial({ color: 0x7ac45e, roughness: 0.6 }));
+      wing.position.set(0, 1.62, 0.35);
+      g.add(wing);
+      hp = 320 * G.enemyMult;
+      dmg = 16 * G.enemyMult;
+      speed = 4.4 * G.speedMult;
+      barY = 2.4;
+    } else if (kind === "scorpion") {
+      /* JEFE del desierto */
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x8a4a1e, roughness: 0.5, metalness: 0.2 });
+      const body = new THREE.Mesh(new THREE.SphereGeometry(1.2, 14, 12), bodyMat);
+      body.scale.set(1.1, 0.7, 1.4);
+      g.add(body);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 10), bodyMat);
+      head.position.z = -1.5;
+      g.add(head);
+      for (const sx of [-1, 1]) {
+        const pincer = new THREE.Mesh(new THREE.SphereGeometry(0.4, 10, 8), bodyMat);
+        pincer.scale.set(1, 0.6, 1.3);
+        pincer.position.set(sx * 1.1, 0.1, -2.2);
+        g.add(pincer);
+        const claw = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.5, 6), bodyMat);
+        claw.rotation.x = -Math.PI / 2;
+        claw.position.set(sx * 1.1, 0.1, -2.9);
+        g.add(claw);
+      }
+      /* cola con aguijón */
+      const tail = new THREE.Group();
+      for (let i = 0; i < 4; i++) {
+        const seg = new THREE.Mesh(new THREE.SphereGeometry(0.24 - i * 0.02, 8, 6), bodyMat);
+        seg.position.set(0, i * 0.32, 0.15 * i);
+        tail.add(seg);
+      }
+      const sting = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.45, 6),
+        new THREE.MeshStandardMaterial({ color: 0x3a1c0a, roughness: 0.4 }));
+      sting.position.set(0, 1.35, 0.6);
+      sting.rotation.x = Math.PI;
+      tail.add(sting);
+      tail.position.set(0, 0.6, 1.5);
+      g.add(tail);
+      g.userData.tail = tail;
+      hp = 900 * G.enemyMult;
+      dmg = 22 * G.enemyMult;
+      speed = 2.6 * G.speedMult;
+      barY = 2.2;
     } else {
       const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3c2f42, roughness: 0.7 });
       const body = new THREE.Mesh(new THREE.SphereGeometry(1.05, 14, 12), bodyMat);
@@ -658,13 +1103,13 @@ export class AntGame {
         leg.rotation.x = (k - 1.5) * 0.25;
         g.add(leg);
       }
-      hp = 170 + this.wave * 14;
-      dmg = 14;
-      speed = 2.7;
+      hp = (170 + this.wave * 14) * G.enemyMult * (elite ? 1.8 : 1);
+      dmg = 14 * G.enemyMult;
+      speed = 2.7 * G.speedMult;
       barY = 1.9;
       g.scale.setScalar(0.95);
     }
-    const bar = this.makeBar();
+    const bar = this.makeBar(elite ? 0xffd34e : g.children.length ? 0xa8e63c : 0xa8e63c);
     bar.position.y = barY + 0.5;
     g.add(bar);
     const a = rand(0, TAU);
@@ -672,8 +1117,13 @@ export class AntGame {
     this.scene.add(g);
     this.enemies.push({
       mesh: g, kind, hp, maxHp: hp, dmg, speed, cd: rand(0, 1), alive: true, bar, phase: rand(0, TAU),
+      elite, boss: kind === "mantis" || kind === "scorpion",
       target: kind === "wasp" ? "steal" : Math.random() < 0.3 ? "player" : "mound",
     });
+    if (this.enemies[this.enemies.length - 1].boss) {
+      this.audio.alarm();
+      this.cb.onBanner(kind === "mantis" ? "🟢 MANTIS DEPREDADORA" : "🦂 ESCORPIÓN REY", "¡Un jefe protege este jardín!");
+    }
   }
 
   /* ------------------------------ eventos ----------------------------- */
@@ -771,12 +1221,20 @@ export class AntGame {
   }
 
   upgradeInfo() {
-    const names = ["Mandíbulas", "Coraza", "Patas"];
-    const descs = ["+10 de daño de mordisco", "+25 de vida máxima", "+15% de velocidad"];
+    const names = ["Mandíbulas", "Coraza", "Patas", "Feromonas", "Soldados Élite", "Reina Real"];
+    const descs = [
+      "+10 de daño de mordisco",
+      "+25 de vida máxima",
+      "+15% de velocidad",
+      "las obreras corren +20%",
+      "soldados: +8 de daño",
+      "la Reina se cura +1 HP/s",
+    ];
+    const maxes = [3, 3, 3, 2, 2, 2];
     return names.map((name, i) => {
       const level = this.upLevels[i];
       const cost = Math.round(60 * Math.pow(1.6, level) / 10) * 10;
-      return { name, desc: descs[i], level, cost, maxed: level >= 3 };
+      return { name, desc: descs[i], level, cost, maxed: level >= maxes[i] };
     });
   }
 
@@ -846,10 +1304,25 @@ export class AntGame {
     this.rain = "none";
     this.rainTimer = 95;
     this.kills = 0;
-    this.counters = { deposited: 0, chambers: 0, kills: 0, milked: 0, bred: 0, waves: 0 };
+    this.counters = { deposited: 0, chambers: 0, kills: 0, milked: 0, bred: 0, waves: 0, gardens: 0, beetles: 0 };
     this.missionIdx = [0, 1, 2];
     this.missionBase = [0, 0, 0];
     this.legendShown = false;
+    this.garden = 0;
+    this.gardenFood = 0;
+    this.gardenWaves = 0;
+    this.gardenBossSpawned = false;
+    this.portalNotified = false;
+    for (const e of this.eggs) this.scene.remove(e.mesh);
+    this.eggs = [];
+    for (const s of this.studs) {
+      s.mesh.visible = true;
+      const a = rand(0, TAU);
+      const r = rand(9, 38);
+      s.mesh.position.set(Math.cos(a) * r, 0.6, Math.sin(a) * r);
+    }
+    this.upLevels = [0, 0, 0, 0, 0, 0];
+    this.applyGardenTheme();
     this.player.position.set(0, 0, 8);
     this.pVel.set(0, 0, 0);
     this.drops.forEach((d) => {
@@ -890,21 +1363,28 @@ export class AntGame {
     return best;
   }
 
+  /** daño común con armadura de escarabajo + destello de golpe */
+  private hitEnemy(e: Enemy, dmg: number): void {
+    let d = dmg;
+    if (e.kind === "beetle" && e.hp > e.maxHp * 0.4) d *= 0.5; // caparazón
+    e.hp -= d;
+    this.biteT = 0.2;
+    this.audio.bite();
+    e.mesh.position.addScaledVector(
+      this.tmpV.copy(e.mesh.position).sub(this.player.position).setY(0).normalize(),
+      e.boss ? 0.15 : 0.5
+    );
+    this.burst(e.mesh.position.clone().setY(1), 0xff5a4e, 6, 2.4);
+    (e.bar.userData.fg as THREE.Mesh).userData.hit = 0.2;
+    if (e.hp <= 0) this.killEnemy(e);
+  }
+
   pressAction() {
     if (!this.started || this.paused) return;
     const biteDmg = 25 + this.upLevels[0] * 10;
     const enemy = this.nearestEnemy(2.5);
     if (enemy && enemy.mesh.position.y < 3.4) {
-      enemy.hp -= biteDmg;
-      this.biteT = 0.2;
-      this.audio.bite();
-      enemy.mesh.position.addScaledVector(
-        this.tmpV.copy(enemy.mesh.position).sub(this.player.position).normalize(),
-        0.5
-      );
-      this.burst(enemy.mesh.position.clone().setY(1), 0xff5a4e, 6, 2.4);
-      (enemy.bar.userData.fg as THREE.Mesh).userData.hit = 0.2;
-      if (enemy.hp <= 0) this.killEnemy(enemy);
+      this.hitEnemy(enemy, biteDmg);
       return;
     }
     if (this.carry.length < 2) {
@@ -944,13 +1424,20 @@ export class AntGame {
     for (const c of this.carry) gain += c.value;
     gain = Math.round(gain * mult);
     this.food += gain;
+    this.gardenFood += gain;
     this.counters.deposited += this.carry.length;
     this.carry = [];
     this.setCarryVisual();
     this.audio.deposit();
     this.cb.onToast(`+${gain} 🍃 almacenadas`, "ok");
     this.burst(this.depositPos.clone().setY(0.8), 0xa8e63c, 10, 2.6);
+    if (this.portalReady() && !this.portalNotified) {
+      this.portalNotified = true;
+      this.cb.onBanner("🌿 PORTAL DE MIGRACIÓN ABIERTO", "¡Lleva la colonia al arco de hojas al norte!");
+      this.audio.alarm();
+    }
   }
+  private portalNotified = false;
 
   private setCarryVisual() {
     for (let i = 0; i < 2; i++) {
@@ -970,11 +1457,20 @@ export class AntGame {
     this.kills++;
     this.counters.kills++;
     this.audio.kill();
-    if (e.kind === "wasp") {
-      this.food += 10;
-      this.cb.onToast("¡Avispa derrotada! +10 🍃 recuperadas", "ok");
+    let loot = 4;
+    if (e.kind === "wasp") loot = 10;
+    else if (e.kind === "beetle") { loot = 25; this.counters.beetles++; }
+    else if (e.kind === "mantis") loot = 40;
+    else if (e.kind === "scorpion") loot = 120;
+    if (e.elite) loot *= 2;
+    this.food += loot;
+    if (e.boss) {
+      this.cb.onBanner(e.kind === "mantis" ? "MANTIS DERROTADA" : "ESCORPIÓN REY DERROTADO", `+${loot} 🍃 de botín real`);
+      this.audio.legend();
+    } else if (e.kind === "wasp") {
+      this.cb.onToast(`¡Avispa derrotada! +${loot} 🍃 recuperadas`, "ok");
     } else {
-      this.cb.onToast("Enemigo derrotado", "ok");
+      this.cb.onToast(e.elite ? `¡ÉLITE dorado derrotado! +${loot} 🍃` : `Enemigo derrotado +${loot} 🍃`, "ok");
     }
   }
 
@@ -1034,11 +1530,12 @@ export class AntGame {
     }
     const t = this.clock.elapsedTime;
     const sp2 = Math.hypot(this.pVel.x, this.pVel.z);
-    for (let i = 0; i < this.legs.length; i++) {
-      this.legs[i].rotation.y = Math.sin(t * (sprint ? 16 : 11) + i * 1.1) * 0.5 * Math.min(1, sp2 / 4);
+    this.avatar?.update(dt, moving, Math.min(1, sp2 / 7), this.player.position.y > 0.05);
+    for (let i = 0; i < this.antennae.length; i++) {
+      this.antennae[i].rotation.z = Math.sin(t * 5 + i * 2) * 0.3;
     }
     this.mandibles.forEach((m, i) => {
-      m.rotation.y = (i === 0 ? 1 : -1) * (0.5 + (this.biteT > 0 ? 0.5 : 0));
+      m.rotation.y = (i === 0 ? 1 : -1) * (0.4 + (this.biteT > 0 ? 0.6 : 0));
     });
     this.biteT = Math.max(0, this.biteT - dt);
 
@@ -1143,7 +1640,7 @@ export class AntGame {
       const threat = this.enemies.find((e) => e.alive && e.kind !== "wasp" && e.mesh.position.distanceTo(p) < 5);
       if (threat) {
         const dir = this.tmpV.copy(this.moundPos).sub(p).normalize();
-        p.addScaledVector(dir, 5.5 * dt);
+        p.addScaledVector(dir, 5.5 * (1 + this.upLevels[3] * 0.2) * dt);
         this.animLegs(w.legs, dt, true);
         continue;
       }
@@ -1174,7 +1671,7 @@ export class AntGame {
           w.item!.respawnAt = this.clock.elapsedTime + 14;
           w.state = "return";
         } else {
-          p.addScaledVector(dir.normalize(), 3.8 * dt);
+          p.addScaledVector(dir.normalize(), 3.8 * (1 + this.upLevels[3] * 0.2) * dt);
           this.faceTo(w.mesh, tgt);
           this.animLegs(w.legs, dt, false);
         }
@@ -1245,8 +1742,12 @@ export class AntGame {
           s.cd -= dt;
           if (s.cd <= 0) {
             s.cd = 0.8;
-            foe.hp -= 20;
+            const dmg = 20 + this.upLevels[4] * 8;
+            let d = dmg;
+            if (foe.kind === "beetle" && foe.hp > foe.maxHp * 0.4) d *= 0.5;
+            foe.hp -= d;
             this.burst(foe.mesh.position.clone().setY(1), 0xff5a4e, 4, 2);
+            (foe.bar.userData.fg as THREE.Mesh).userData.hit = 0.15;
             if (foe.hp <= 0) this.killEnemy(foe);
           }
         }
@@ -1342,6 +1843,77 @@ export class AntGame {
           this.lastHurt = t;
           this.audio.hurt();
         }
+      } else if (e.kind === "beetle") {
+        /* tanque lento hacia el hormiguero */
+        const dir = this.tmpV.copy(this.moundPos).sub(p);
+        dir.y = 0;
+        const dist = dir.length();
+        if (dist > 3.4) {
+          p.addScaledVector(dir.normalize(), e.speed * dt);
+          this.faceTo(e.mesh, this.moundPos);
+        }
+        const pd = p.distanceTo(this.player.position);
+        if (pd < 2.2 && e.cd <= 0) {
+          e.cd = 1.4;
+          this.hp -= e.dmg;
+          this.lastHurt = t;
+          this.audio.hurt();
+          this.knockPlayer(p);
+        }
+        if (Math.hypot(p.x - this.moundPos.x, p.z - this.moundPos.z) < 4.4 && e.cd <= 0) {
+          e.cd = 1.3;
+          this.queenHp = Math.max(0, this.queenHp - 7);
+          this.burst(this.moundPos.clone().setY(1.5), 0xff5a4e, 3, 1.6);
+          if (this.queenHp <= 0) this.gameOver();
+        }
+      } else if (e.kind === "mantis") {
+        /* depredadora: persigue al jugador y se abalanza */
+        const dir = this.tmpV.copy(this.player.position).sub(p);
+        dir.y = 0;
+        const dist = dir.length();
+        if (e.cd > 0) e.cd -= dt;
+        if (dist > 2.2) {
+          const dash = dist < 8 && e.cd <= 0 ? 3.2 : 1;
+          if (dash > 1) {
+            e.cd = 3;
+            this.audio.buzz();
+            this.burst(p.clone().setY(1.2), 0x7ac45e, 8, 2);
+          }
+          p.addScaledVector(dir.normalize(), e.speed * dash * dt);
+          this.faceTo(e.mesh, this.player.position);
+          p.y = 0.2 + Math.abs(Math.sin(t * 8)) * 0.15;
+        }
+        if (dist < 2.4 && e.cd <= 0) {
+          e.cd = 1.1;
+          this.hp -= e.dmg;
+          this.lastHurt = t;
+          this.audio.hurt();
+          this.knockPlayer(p);
+        }
+      } else if (e.kind === "scorpion") {
+        /* JEFE: avanza lento, cola alzada, pisotón AOE */
+        const tail = e.mesh.userData.tail as THREE.Group | undefined;
+        if (tail) tail.rotation.x = Math.sin(t * 3) * 0.2 - 0.3;
+        const dir = this.tmpV.copy(this.player.position).sub(p);
+        dir.y = 0;
+        const dist = dir.length();
+        if (dist > 2.8) {
+          p.addScaledVector(dir.normalize(), e.speed * dt);
+          this.faceTo(e.mesh, this.player.position);
+        }
+        if (e.cd > 0) e.cd -= dt;
+        if (dist < 3.6 && e.cd <= 0) {
+          e.cd = 2.5;
+          this.audio.thunder();
+          this.burst(p.clone().setY(0.6), 0xc49a5e, 18, 4);
+          this.cb.onToast("🦂 ¡PISOTÓN DEL ESCORPIÓN!", "bad");
+          if (this.player.position.distanceTo(p) < 4.2) {
+            this.hp -= e.dmg;
+            this.lastHurt = t;
+            this.audio.hurt();
+            this.knockPlayer(p);
+          }
+        }
       } else {
         const dir = this.tmpV.copy(this.player.position).sub(p);
         dir.y = 0;
@@ -1384,17 +1956,30 @@ export class AntGame {
       this.waveTimer -= dt;
       if (this.waveTimer <= 0) {
         this.waveState = "active";
-        const ants = Math.min(9, 2 + this.wave);
+        const G = GARDENS[this.garden];
+        const ants = Math.min(10, Math.round((2 + this.wave) * (1 + this.garden * 0.15)));
         for (let i = 0; i < ants; i++) this.spawnEnemy("ant");
         if (this.wave % 2 === 0) this.spawnEnemy("wasp");
         if (this.wave % 3 === 0) this.spawnEnemy("spider");
+        if (this.garden >= 2 && this.wave % 2 === 1) this.spawnEnemy("beetle");
+        if (this.garden >= 3 && this.wave % 3 === 2) this.spawnEnemy("beetle");
+        /* jefes de jardín */
+        if (G.boss === "mantis" && this.wave >= 2 && !this.gardenBossSpawned) {
+          this.gardenBossSpawned = true;
+          this.spawnEnemy("mantis");
+        }
+        if (G.boss === "scorpion" && this.wave >= 2 && !this.gardenBossSpawned) {
+          this.gardenBossSpawned = true;
+          this.spawnEnemy("scorpion");
+        }
         this.cb.onToast(`${this.enemies.filter((e) => e.alive).length} enemigos entraron al jardín`, "bad");
       }
     } else if (this.enemies.every((e) => !e.alive)) {
       this.waveState = "calm";
       this.wavesSurvived = this.wave;
       this.counters.waves = this.wavesSurvived;
-      this.waveTimer = Math.max(28, 62 - this.wave * 2.5);
+      this.gardenWaves++;
+      this.waveTimer = Math.max(24, 62 - this.wave * 2.5 - this.garden * 2);
       this.cb.onToast(`Oleada ${this.wave} superada · +respiro de ${Math.ceil(this.waveTimer)}s`, "ok");
       this.record = Math.max(this.record, this.wavesSurvived);
     }
@@ -1510,6 +2095,10 @@ export class AntGame {
         this.mushTimer = 8;
         this.food += 1;
       }
+    }
+    /* regeneración de la Reina (mejora) */
+    if (this.upLevels[5] > 0 && this.queenHp < this.queenMax) {
+      this.queenHp = Math.min(this.queenMax, this.queenHp + this.upLevels[5] * dt);
     }
     /* pájaros ambiente */
     this.birdTimer -= dt;
@@ -1696,7 +2285,26 @@ export class AntGame {
       legend: this.legendShown,
       over: this.queenHp <= 0,
       stats: { wave: this.wavesSurvived, food: Math.floor(this.food), kills: this.kills },
-      minimap: { px: this.player.position.x, pz: this.player.position.z, items: mmItems, enemies: mmEnemies },
+      minimap: {
+        px: this.player.position.x, pz: this.player.position.z,
+        items: mmItems, enemies: mmEnemies,
+        portal: this.garden < GARDENS.length - 1 ? [0, -30] : null,
+      },
+      garden: this.garden,
+      gardenName: GARDENS[this.garden].name,
+      gardenSub: GARDENS[this.garden].sub,
+      portal: {
+        ready: this.portalReady(),
+        food: Math.floor(this.gardenFood),
+        foodGoal: GARDENS[this.garden].foodGoal,
+        waves: this.gardenWaves,
+        wavesGoal: GARDENS[this.garden].waveGoal,
+      },
+      boss: (() => {
+        const b = this.enemies.find((e) => e.alive && e.boss);
+        return b ? { hp: Math.max(0, Math.round(b.hp)), max: b.maxHp, name: b.kind === "mantis" ? "MANTIS" : "ESCORPIÓN REY" } : null;
+      })(),
+      eggs: this.eggs.length,
     });
   }
 
@@ -1712,6 +2320,9 @@ export class AntGame {
         this.updateEnemies(dt);
         this.updateWaves(dt);
         this.updateRain(dt);
+        this.updateStuds(dt);
+        this.updateEggs(dt);
+        this.updatePortal(dt);
         this.updateWorldBits(dt);
         this.checkMissions();
         this.checkLegend();

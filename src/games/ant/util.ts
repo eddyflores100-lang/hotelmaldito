@@ -25,12 +25,16 @@ function tex(c: HTMLCanvasElement, repeat = 1): THREE.Texture {
 }
 
 /** Suelo de tierra moteada. */
-export function soilTexture(): THREE.Texture {
+/** Suelo del jardín — colores parametrizables por jardín. */
+export function soilTexture(base = "#6b4a2f", alt = ""): THREE.Texture {
   const [c, ctx] = makeCanvas(256, 256);
-  ctx.fillStyle = "#6b4a2f";
+  ctx.fillStyle = base;
   ctx.fillRect(0, 0, 256, 256);
+  const palette = alt
+    ? [shade(base, -0.12), shade(base, 0.1), shade(base, 0.2), shade(base, -0.2)]
+    : ["#5d3f27", "#7a5636", "#84613e", "#513620"];
   for (let i = 0; i < 900; i++) {
-    ctx.fillStyle = ["#5d3f27", "#7a5636", "#84613e", "#513620"][Math.floor(rand(0, 4))];
+    ctx.fillStyle = palette[Math.floor(rand(0, 4))];
     ctx.beginPath();
     ctx.arc(rand(0, 256), rand(0, 256), rand(1, 4), 0, TAU);
     ctx.fill();
@@ -50,6 +54,15 @@ export function soilTexture(): THREE.Texture {
   return tex(c, 7);
 }
 
+/** aclara (+t) u oscurece (−t) un color hex */
+export function shade(hex: string, t: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.max(0, Math.min(255, ((n >> 16) & 255) + 255 * t));
+  const g = Math.max(0, Math.min(255, ((n >> 8) & 255) + 255 * t));
+  const b = Math.max(0, Math.min(255, (n & 255) + 255 * t));
+  return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+}
+
 /** Montículo del hormiguero (granulado más oscuro). */
 export function moundTexture(): THREE.Texture {
   const [c, ctx] = makeCanvas(256, 256);
@@ -65,13 +78,13 @@ export function moundTexture(): THREE.Texture {
 }
 
 /** Cielo degradado para el fondo del jardín. */
-export function skyTexture(): THREE.Texture {
+export function skyTexture(top = "#4da3e8", mid = "#a8d8f0", low = "#d8ecd8", floor = "#b7d489"): THREE.Texture {
   const [c, ctx] = makeCanvas(64, 256);
   const g = ctx.createLinearGradient(0, 0, 0, 256);
-  g.addColorStop(0, "#4da3e8");
-  g.addColorStop(0.55, "#a8d8f0");
-  g.addColorStop(0.8, "#d8ecd8");
-  g.addColorStop(1, "#b7d489");
+  g.addColorStop(0, top);
+  g.addColorStop(0.55, mid);
+  g.addColorStop(0.8, low);
+  g.addColorStop(1, floor);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 64, 256);
   const t = new THREE.CanvasTexture(c);

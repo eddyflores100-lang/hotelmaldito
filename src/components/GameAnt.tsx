@@ -3,7 +3,7 @@
    GameLab by AliceLabs
    ============================================================ */
 import { useEffect, useRef, useState } from "react";
-import { Bug, CloudRain, Crown, Egg, Heart, Pause, Play, Shield, Sparkles, Swords, Volume2, VolumeX, X } from "lucide-react";
+import { Bug, CloudRain, Crown, Egg, Heart, Leaf, Pause, Play, Shield, Sparkles, Swords, Volume2, VolumeX, X } from "lucide-react";
 import { AntGame, type AntHud } from "../games/ant/AntGame";
 
 type Toast = { id: number; msg: string; kind: "ok" | "bad" | "info" };
@@ -155,6 +155,7 @@ export default function GameAnt({ onExit }: { onExit?: () => void }) {
               <div className="mt-1.5 flex items-center gap-3">
                 <span className="font-display text-lg leading-none text-[#a8e63c]">{hud.food} 🍃</span>
                 <span className="font-display text-[10px] text-[#8fa4c2]">carga {hud.carry}/2</span>
+                {hud.eggs > 0 && <span className="font-display text-[10px] text-[#d8b4ff]">🥚 {hud.eggs}</span>}
               </div>
               <div className="mt-1 flex gap-2 text-[10px] text-[#8fa4c2]">
                 <span className="flex items-center gap-1"><Bug size={11} /> {hud.workers}/8</span>
@@ -171,8 +172,25 @@ export default function GameAnt({ onExit }: { onExit?: () => void }) {
             </div>
           </div>
 
-          {/* arriba-centro: oleada + lluvia */}
+          {/* arriba-centro: jardín + metas + oleada + lluvia */}
           <div className="absolute left-1/2 top-3 flex -translate-x-1/2 flex-col items-center gap-1.5">
+            <div className="flex items-center gap-2 rounded-xl border border-[#4c7a2f] bg-[#122008]/85 px-3 py-1.5 backdrop-blur">
+              <Leaf size={13} className="text-[#a8e63c]" />
+              <span className="font-display text-xs text-[#a8e63c]">{hud.gardenName}</span>
+              <span className="hidden text-[10px] text-[#8fa4c2] sm:inline">· {hud.gardenSub}</span>
+            </div>
+            {hud.portal && hud.garden < 4 && (
+              <div className="flex items-center gap-2 rounded-lg border border-[#223350] bg-[#0b1526]/85 px-2.5 py-1 text-[10px] backdrop-blur">
+                <span className={hud.portal.ready ? "text-[#d8ff6a]" : "text-[#8fa4c2]"}>
+                  {hud.portal.ready ? "🌿 PORTAL ABIERTO — ve al arco del norte" : `Comida ${hud.portal.food}/${hud.portal.foodGoal} · Oleadas ${hud.portal.waves}/${hud.portal.wavesGoal}`}
+                </span>
+              </div>
+            )}
+            {hud.garden >= 4 && (
+              <div className="flex items-center gap-2 rounded-lg border border-[#7a4aff]/50 bg-[#160d2c]/85 px-2.5 py-1 text-[10px] text-[#c9a8ff] backdrop-blur">
+                TERRARIO INFINITO · sobrevive todo lo que puedas
+              </div>
+            )}
             <div
               className="flex items-center gap-2 rounded-xl border px-3 py-1.5 font-display text-[11px] backdrop-blur"
               style={
@@ -194,6 +212,14 @@ export default function GameAnt({ onExit }: { onExit?: () => void }) {
               {hud.rain === "warning" && <span className="text-[#9ed2ff]">¡LLUVIA EN {hud.rainIn}s!</span>}
               {hud.rain === "active" && <span className="text-[#9ed2ff]">¡LLUVIA! refúgiate</span>}
             </div>
+            {hud.boss && (
+              <div className="w-64 sm:w-80">
+                <div className="mb-0.5 text-center font-display text-[10px] tracking-widest text-[#ffb0aa]">☠ {hud.boss.name}</div>
+                <div className="h-2.5 overflow-hidden rounded-full border border-[#ff5a4e]/50 bg-[#1a0808]">
+                  <div className="h-full bg-gradient-to-r from-[#ff2418] to-[#ffa04e] transition-[width]" style={{ width: `${(hud.boss.hp / hud.boss.max) * 100}%` }} />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* arriba-derecha: reina + botones */}
@@ -374,23 +400,23 @@ export default function GameAnt({ onExit }: { onExit?: () => void }) {
             <div className="mb-2 font-display text-[10px] tracking-widest text-[#8fa4c2]">CRIAR</div>
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={() => gameRef.current?.breed("worker")}
+                onClick={() => gameRef.current?.buyEgg("worker")}
                 className="flex items-center gap-2 rounded-xl border border-[#a8e63c]/40 bg-[#0f1b31] p-3 text-left transition hover:border-[#a8e63c]"
               >
-                <Bug size={18} className="text-[#a8e63c]" />
+                <Egg size={18} className="text-[#d8b4ff]" />
                 <div>
-                  <div className="font-display text-[11px] text-[#e9f1fc]">OBRERA · 20🍃</div>
-                  <div className="text-[10px] text-[#8fa4c2]">recolecta sola ({hud.workers}/8)</div>
+                  <div className="font-display text-[11px] text-[#e9f1fc]">HUEVO DE OBRERA · 20🍃</div>
+                  <div className="text-[10px] text-[#8fa4c2]">ecolona en 8 s · recolecta sola ({hud.workers}/8)</div>
                 </div>
               </button>
               <button
-                onClick={() => gameRef.current?.breed("soldier")}
-                className="flex items-center gap-2 rounded-xl border border-[#a8e63c]/40 bg-[#0f1b31] p-3 text-left transition hover:border-[#a8e63c]"
+                onClick={() => gameRef.current?.buyEgg("soldier")}
+                className="flex items-center gap-2 rounded-xl border border-[#f4c542]/40 bg-[#0f1b31] p-3 text-left transition hover:border-[#f4c542]"
               >
-                <Swords size={18} className="text-[#a8e63c]" />
+                <Swords size={18} className="text-[#f4c542]" />
                 <div>
-                  <div className="font-display text-[11px] text-[#e9f1fc]">SOLDADO · 30🍃</div>
-                  <div className="text-[10px] text-[#8fa4c2]">te acompaña y lucha ({hud.soldiers}/4)</div>
+                  <div className="font-display text-[11px] text-[#e9f1fc]">HUEVO DE SOLDADO · 30🍃</div>
+                  <div className="text-[10px] text-[#8fa4c2]">ecolona en 8 s · te acompaña y lucha ({hud.soldiers}/4)</div>
                 </div>
               </button>
             </div>
@@ -406,7 +432,7 @@ export default function GameAnt({ onExit }: { onExit?: () => void }) {
                 >
                   <div>
                     <div className="font-display text-[11px] text-[#e9f1fc]">
-                      {u.name} · nv {u.level}/3
+                      {u.name} · nv {u.level}
                     </div>
                     <div className="text-[10px] text-[#8fa4c2]">{u.desc}</div>
                   </div>
@@ -498,11 +524,12 @@ export default function GameAnt({ onExit }: { onExit?: () => void }) {
             </h1>
             <div className="mt-1 font-display text-lg text-[#e9f1fc] sm:text-xl">GUERRA DEL JARDÍN</div>
             <p className="mx-auto mt-3 max-w-md text-xs leading-relaxed text-[#8fa4c2] sm:text-sm">
-              Dirige tu colonia en un jardín a escala épica: recolecta migas y rocío, excava cámaras,
-              cría obreras y soldados… y defiende a la Reina de hormigas rojas, avispas y arañas antes de que llegue la lluvia.
+              Aventura de colonias estilo Roblox: eres una hormiga obrera con casco que recolecta, excava
+              cámaras, incuba huevos y defiende a la Reina. Migra por <span className="text-[#d3f58a]">5 jardines</span> —
+              del Patio Trasero al Terrario Infinito — esquivando escarabajos acorazados, mantis y al Escorpión Rey.
             </p>
             <div className="mt-3 flex flex-wrap justify-center gap-1.5">
-              {["Estrategia de colonias", "Mundo macro", "Demo jugable"].map((c) => (
+              {["Avatar R6", "5 Jardines", "Jefes + Élites", "Huevos"].map((c) => (
                 <span key={c} className="rounded-full border border-[#a8e63c]/35 bg-[#a8e63c]/10 px-2.5 py-0.5 text-[10px] text-[#d3f58a]">
                   {c}
                 </span>
