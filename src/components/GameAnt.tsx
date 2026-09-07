@@ -85,33 +85,84 @@ export default function GameAnt({ onExit }: { onExit?: () => void }) {
     if (!cv || !hud) return;
     const ctx = cv.getContext("2d");
     if (!ctx) return;
-    const W = cv.width, H = cv.height, S = W / 96;
+    const W = cv.width, H = cv.height, S = W / 104;
+    const t = performance.now() / 300;
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = "rgba(10,16,10,0.82)";
+    /* fondo + retícula */
+    ctx.fillStyle = "rgba(12,20,10,0.86)";
     ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = "rgba(168,230,60,0.12)";
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 5; i++) {
+      ctx.beginPath(); ctx.moveTo((W / 5) * i, 0); ctx.lineTo((W / 5) * i, H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, (H / 5) * i); ctx.lineTo(W, (H / 5) * i); ctx.stroke();
+    }
     const map = (x: number, z: number): [number, number] => [W / 2 + x * S, H / 2 + z * S];
+    /* brújula */
+    ctx.fillStyle = "rgba(233,241,252,0.75)";
+    ctx.font = "bold 10px 'Bungee', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("N", W / 2, 11);
+    /* NIDO (hormiguero) */
+    const [nx, nz] = map(0, 14);
     ctx.fillStyle = "#8a5f3a";
-    const [mx, mz] = map(0, 16);
-    ctx.beginPath();
-    ctx.arc(mx, mz, 6, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.strokeStyle = "#ffd23e";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(nx, nz, 6.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#ffe9a8";
+    ctx.font = "bold 8px 'Bungee', sans-serif";
+    ctx.fillText("NIDO", nx, nz + 15);
+    /* PORTAL (arco del norte) */
+    if (hud.minimap.portal) {
+      const [gx, gz] = map(hud.minimap.portal[0], hud.minimap.portal[1]);
+      const ready = hud.portal?.ready;
+      ctx.globalAlpha = ready ? 0.55 + Math.sin(t * 2) * 0.35 : 0.85;
+      ctx.fillStyle = ready ? "#d8ff6a" : "#9a5cff";
+      ctx.beginPath(); ctx.arc(gx, gz, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = ready ? "#d8ff6a" : "#b28aff";
+      ctx.fillText(ready ? "PORTAL" : "", gx, gz - 7);
+    }
+    /* objetivo del tutorial: estrella dorada */
+    if (hud.tut?.target) {
+      const [tx, tz] = map(hud.tut.target[0], hud.tut.target[1]);
+      ctx.fillStyle = "#ffd23e";
+      ctx.strokeStyle = "#0b1526";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const r = i % 2 === 0 ? 6.5 : 2.8;
+        const a = (i / 8) * Math.PI * 2 - Math.PI / 2 + Math.sin(t) * 0.2;
+        const px = tx + Math.cos(a) * r, py = tz + Math.sin(a) * r;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    /* comida */
     ctx.fillStyle = "#ffd23e";
     for (let i = 0; i < hud.minimap.items.length; i += 2) {
       const [x, y] = map(hud.minimap.items[i], hud.minimap.items[i + 1]);
-      ctx.fillRect(x - 1, y - 1, 2.4, 2.4);
+      ctx.fillRect(x - 1.2, y - 1.2, 2.4, 2.4);
     }
+    /* enemigos */
     ctx.fillStyle = "#ff5a4e";
+    ctx.strokeStyle = "rgba(10,10,10,0.6)";
     for (let i = 0; i < hud.minimap.enemies.length; i += 2) {
       const [x, y] = map(hud.minimap.enemies[i], hud.minimap.enemies[i + 1]);
-      ctx.beginPath();
-      ctx.arc(x, y, 2.6, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, 2.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
+    /* jugador: flecha con orientación */
     const [px, pz] = map(hud.minimap.px, hud.minimap.pz);
-    ctx.fillStyle = LIME;
+    ctx.save();
+    ctx.translate(px, pz);
+    ctx.rotate(-(hud.minimap.yaw ?? 0));
+    ctx.fillStyle = "#a8e63c";
+    ctx.strokeStyle = "#0b1526";
+    ctx.lineWidth = 1.4;
     ctx.beginPath();
-    ctx.arc(px, pz, 3.4, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(0, -6); ctx.lineTo(4.2, 5); ctx.lineTo(0, 2.6); ctx.lineTo(-4.2, 5);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
   }, [hud]);
 
   const play = () => {
@@ -162,6 +213,24 @@ export default function GameAnt({ onExit }: { onExit?: () => void }) {
                 <span className="flex items-center gap-1"><Swords size={11} /> {hud.soldiers}/4</span>
               </div>
             </div>
+            {/* misión/tutorial activo */}
+            {hud.tut && (
+              <div className="max-w-[250px] rounded-xl border-2 border-[#ffd23e]/70 bg-[#1a1508]/92 px-3 py-2 backdrop-blur">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 font-display text-[10px] tracking-widest text-[#ffd23e]">
+                    ★ MISIÓN
+                  </span>
+                  <span className="font-display text-[9px] text-[#8fa4c2]">
+                    PASO {hud.tut.step + 1}/{hud.tut.total}
+                  </span>
+                </div>
+                <div className="mt-0.5 text-[11px] leading-snug text-[#ffe9a8]">{hud.tut.text}</div>
+                <div className="mt-1 flex items-center gap-1 text-[9px] text-[#8fa4c2]">
+                  <span className="inline-block h-2 w-2 rounded-full" style={{ background: LIME }} />
+                  sigue el haz de luz verde y la estrella del mapa
+                </div>
+              </div>
+            )}
             {/* misiones */}
             <div className="flex flex-col gap-1">
               {hud.missions.map((m, i) => (
@@ -255,11 +324,29 @@ export default function GameAnt({ onExit }: { onExit?: () => void }) {
           </div>
 
           {/* minimapa */}
-          <canvas ref={miniRef} width={128} height={128} className="absolute bottom-40 left-3 h-24 w-24 rounded-xl border border-[#223350] backdrop-blur sm:bottom-6 sm:h-32 sm:w-32" />
+          <canvas ref={miniRef} width={176} height={176} className="absolute bottom-40 left-3 h-28 w-28 rounded-xl border border-[#223350] backdrop-blur sm:bottom-6 sm:h-36 sm:w-36" />
+
+          {/* recordatorio de controles (escritorio) */}
+          {!isTouch.current && (
+            <div className="pointer-events-none absolute bottom-2.5 left-1/2 flex -translate-x-1/2 flex-wrap justify-center gap-x-2.5 gap-y-1 rounded-full border border-[#223350] bg-[#0b1526]/75 px-3.5 py-1.5 backdrop-blur">
+              {[
+                ["WASD", "mover"],
+                ["ESPACIO", "saltar"],
+                ["E", "recoger / morder"],
+                ["MANTÉN E", "excavar"],
+                ["U", "colonia"],
+              ].map(([k, v]) => (
+                <span key={k} className="flex items-center gap-1 whitespace-nowrap text-[10px] text-[#8fa4c2]">
+                  <kbd className="rounded bg-[#223350] px-1.5 py-0.5 font-display text-[9px] text-[#e9f1fc]">{k}</kbd>
+                  {v}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* prompt */}
           {hud.prompt && !evoOpen && (
-            <div className="pointer-events-none absolute bottom-24 left-1/2 -translate-x-1/2 rounded-full border border-[#a8e63c]/40 bg-[#0b1526]/90 px-4 py-1.5 font-display text-[11px] text-[#d3f58a] backdrop-blur sm:bottom-8 sm:text-xs">
+            <div className="pointer-events-none absolute bottom-24 left-1/2 -translate-x-1/2 rounded-full border border-[#a8e63c]/40 bg-[#0b1526]/90 px-4 py-1.5 font-display text-[11px] text-[#d3f58a] backdrop-blur sm:bottom-12 sm:text-xs">
               {hud.prompt}
             </div>
           )}
@@ -463,6 +550,21 @@ export default function GameAnt({ onExit }: { onExit?: () => void }) {
           <div className="w-72 rounded-2xl border border-[#223350] bg-[#0b1526] p-6 text-center">
             <div className="font-display text-2xl text-[#a8e63c]">PAUSA</div>
             <div className="mt-1 text-xs text-[#8fa4c2]">Oleadas sobrevividas: {hud?.stats.wave ?? 0}</div>
+            <div className="mt-4 rounded-xl border border-[#223350] bg-[#0f1b31]/60 p-3 text-left">
+              <div className="font-display text-[10px] tracking-widest text-[#8fa4c2]">CÓMO JUGAR</div>
+              <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-[#8fa4c2]">
+                <span><kbd className="rounded bg-[#223350] px-1 py-0.5 font-display text-[9px] text-[#e9f1fc]">WASD</kbd> moverse</span>
+                <span><kbd className="rounded bg-[#223350] px-1 py-0.5 font-display text-[9px] text-[#e9f1fc]">ESPACIO</kbd> saltar</span>
+                <span><kbd className="rounded bg-[#223350] px-1 py-0.5 font-display text-[9px] text-[#e9f1fc]">E</kbd> recoger / morder</span>
+                <span><kbd className="rounded bg-[#223350] px-1 py-0.5 font-display text-[9px] text-[#e9f1fc]">MANTÉN E</kbd> excavar</span>
+                <span><kbd className="rounded bg-[#223350] px-1 py-0.5 font-display text-[9px] text-[#e9f1fc]">U</kbd> colonia</span>
+                <span>Ratón: cámara</span>
+              </div>
+              <div className="mt-2 text-[10px] leading-snug text-[#c9d6ea]">
+                Recoge 🍃 y deposítalas en el <span className="text-[#ffd23e]">NIDO</span> · cría obreras y soldados con [U] ·
+                excava cámaras · cuando el <span className="text-[#9a5cff]">PORTAL</span> se abra, migra de jardín.
+              </div>
+            </div>
             <button
               onClick={() => doPause(false)}
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#a8e63c] py-2.5 font-display text-sm text-[#12220a] transition hover:brightness-110"

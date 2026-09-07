@@ -71,7 +71,8 @@ export type AntHud = {
   portal: { ready: boolean; food: number; foodGoal: number; waves: number; wavesGoal: number };
   boss: { hp: number; max: number; name: string } | null;
   eggs: number;
-  minimap: { px: number; pz: number; items: number[]; enemies: number[]; portal: [number, number] | null };
+  minimap: { px: number; pz: number; yaw: number; items: number[]; enemies: number[]; portal: [number, number] | null };
+  tut: { step: number; total: number; text: string; target: [number, number] | null } | null;
 };
 
 export type AntCallbacks = {
@@ -192,6 +193,9 @@ export class AntGame {
 
   /* misiones */
   private counters = { deposited: 0, chambers: 0, kills: 0, milked: 0, bred: 0, waves: 0, gardens: 0, beetles: 0 };
+  private tutStep = 0;
+  private tutTarget: THREE.Vector3 | null = null;
+  private tutBeacon: THREE.Group | null = null;
   private missionIdx = [0, 1, 2];
   private missionPool = [
     { text: "Deposita comida en el hormiguero", goal: 6, reward: 15, key: "deposited" as const },
@@ -289,8 +293,131 @@ export class AntGame {
     this.particles.frustumCulled = false;
     this.scene.add(this.particles);
 
+    this.buildTutBeacon();
+
     this.record = Number(localStorage.getItem("hormiguero_record") || 0);
     this.bindEvents();
+  }
+
+  /* --------------------------- tutorial ------------------------------ */
+  /** Balizador estilo Roblox: haz de luz + flecha dorada sobre el objetivo actual. */
+  private buildTutBeacon() {
+    const g = new THREE.Group();
+    const beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.5, 0.5, 9, 12, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xa8e63c, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false })
+    );
+    beam.position.y = 4.5;
+    g.add(beam);
+    const arrow = new THREE.Mesh(
+      new THREE.ConeGeometry(0.46, 0.9, 4),
+      new THREE.MeshBasicMaterial({ color: 0xffd23e })
+    );
+    arrow.rotation.x = Math.PI;
+    arrow.position.y = 3.2;
+    g.add(arrow);
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.95, 1.2, 26),
+      new THREE.MeshBasicMaterial({ color: 0xffd23e, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.09;
+    g.add(ring);
+    g.visible = false;
+    this.scene.add(g);
+    this.tutBeacon = g;
+  }
+
+  private nearestItemPos(): THREE.Vector3 | null {
+    let best: THREE.Vector3 | null = null;
+    let bd = Infinity;
+    for (const it of this.items) {
+      if (it.taken) continue;
+      const d = it.mesh.position.distanceToSquared(this.player.position);
+      if (d < bd) { bd = d; best = it.mesh.position; }
+    }
+    return best;
+  }
+
+  private nearestUnbuiltChamber(): THREE.Vector3 | null {
+    let best: THREE.Vector3 | null = null;
+    let bd = Infinity;
+    for (const [, c] of this.chambers) {
+      if (c.built) continue;
+      const d = (c.x - this.player.position.x) ** 2 + (c.z - this.player.position.z) ** 2;
+      if (d < bd) { bd = d; best = new THREE.Vector3(c.x, 0, c.z); }
+    }
+    return best;
+  }
+
+  private nearestEnemyPos(): THREE.Vector3 | null {
+    let best: THREE.Vector3 | null = null;
+    let bd = Infinity;
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      const d = e.mesh.position.distanceToSquared(this.player.position);
+      if (d < bd) { bd = d; best = e.mesh.position; }
+    }
+    return best;
+  }
+
+  /** Avanza los pasos del tutorial y recalcula el objetivo del balizador. */
+  private tutUpdate() {
+    if (this.tutStep === 0 && this.counters.deposited >= 2) {
+      this.tutStep = 1;
+      this.audio.legend();
+      this.cb.onToast("¡Bien! Ahora cría tu primera obrera con la comida", "ok");
+    }
+    if (this.tutStep === 1 && this.counters.bred >= 1) {
+      this.tutStep = 2;
+      this.audio.legend();
+      this.cb.onToast("¡Obrera en camino! Ahora excava tu primera cámara", "ok");
+    }
+    if (this.tutStep === 2 && this.counters.chambers >= 1) {
+      this.tutStep = 3;
+      this.audio.legend();
+      this.cb.onToast("¡Cámara lista! Sobrevive a la oleada para completar el tutorial", "ok");
+    }
+    if (this.tutStep === 3 && this.counters.waves >= 1) {
+      this.tutStep = 4;
+      this.tutTarget = null;
+      this.audio.legend();
+      this.cb.onBanner("¡TUTORIAL COMPLETADO!", "Cría hormigas · excava cámaras · migra cuando el portal se abra");
+    }
+    if (this.tutStep === 0) this.tutTarget = this.carry.length > 0 ? this.depositPos : this.nearestItemPos();
+    else if (this.tutStep === 1) this.tutTarget = this.depositPos;
+    else if (this.tutStep === 2) this.tutTarget = this.nearestUnbuiltChamber();
+    else if (this.tutStep === 3) this.tutTarget = this.nearestEnemyPos();
+    else this.tutTarget = null;
+  }
+
+  private updateTutBeacon(dt: number) {
+    if (!this.tutBeacon) return;
+    const show = this.started && this.tutStep < 4 && !!this.tutTarget;
+    this.tutBeacon.visible = show;
+    if (!show || !this.tutTarget) return;
+    this.tutBeacon.position.set(this.tutTarget.x, 0, this.tutTarget.z);
+    this.tutBeacon.rotation.y += dt * 2.2;
+    const arrow = this.tutBeacon.children[1] as THREE.Mesh;
+    arrow.position.y = 3.2 + Math.sin(this.clock.elapsedTime * 3) * 0.28;
+  }
+
+  private tutInfo(): AntHud["tut"] {
+    if (!this.started || this.tutStep >= 4) return null;
+    const texts = [
+      this.carry.length > 0
+        ? "¡Carga lista! Llévala al NIDO (anillo verde) y pulsa [E]"
+        : "Recoge comida: acércate a hojas y migas y pulsa [E] · deposita 2 cargas",
+      "Pulsa [U] y cria un HUEVO DE OBRERA con tu comida",
+      "Mantén [E] junto a un anillo de tierra para excavar una CÁMARA",
+      "¡Defiende el hormiguero! Sigue al balizador y pica con [E]",
+    ];
+    return {
+      step: this.tutStep,
+      total: 4,
+      text: texts[this.tutStep],
+      target: this.tutTarget ? [this.tutTarget.x, this.tutTarget.z] : null,
+    };
   }
 
   /* ------------------------------ mundo ------------------------------ */
@@ -585,40 +712,39 @@ export class AntGame {
     const accent = new THREE.MeshStandardMaterial({ color: accentCol, roughness: 0.5 });
     const dark = new THREE.MeshStandardMaterial({ color: 0x241812, roughness: 0.6 });
 
-    const abdomen = new THREE.Mesh(new THREE.SphereGeometry(0.52, 12, 10), body);
-    abdomen.scale.set(1, 0.9, 1.35);
-    abdomen.position.set(0, 0.52, 0.62);
+    /* cuerpo blocky estilo Roblox R6: piezas cúbicas redondeadas */
+    const abdomen = new THREE.Mesh(new RoundedBoxGeometry(0.8, 0.64, 1, 2, 0.15), body);
+    abdomen.position.set(0, 0.54, 0.6);
     g.add(abdomen);
-    const thorax = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.42, 4, 10), body);
-    thorax.rotation.x = Math.PI / 2;
-    thorax.position.set(0, 0.5, -0.12);
+    const thorax = new THREE.Mesh(new RoundedBoxGeometry(0.58, 0.46, 0.64, 2, 0.11), body);
+    thorax.position.set(0, 0.52, -0.1);
     g.add(thorax);
-    const waist = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), dark);
-    waist.position.set(0, 0.5, 0.32);
+    const waist = new THREE.Mesh(new RoundedBoxGeometry(0.28, 0.26, 0.3, 1, 0.06), dark);
+    waist.position.set(0, 0.5, 0.26);
     g.add(waist);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.36, 12, 10), body);
-    head.position.set(0, 0.56, -0.62);
+    const head = new THREE.Mesh(new RoundedBoxGeometry(0.64, 0.56, 0.56, 2, 0.13), body);
+    head.position.set(0, 0.6, -0.58);
     g.add(head);
     for (const sx of [-0.17, 0.17]) {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.25 }));
-      eye.position.set(sx, 0.66, -0.9);
+      const eye = new THREE.Mesh(new RoundedBoxGeometry(0.14, 0.14, 0.08, 1, 0.03), new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.25 }));
+      eye.position.set(sx, 0.66, -0.85);
       g.add(eye);
     }
     const antennae: THREE.Object3D[] = [];
     for (const sx of [-0.14, 0.14]) {
-      const ant = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.5, 3, 6), dark);
-      ant.position.set(sx, 0.85, -0.78);
+      const ant = new THREE.Mesh(new RoundedBoxGeometry(0.06, 0.52, 0.06, 1, 0.02), dark);
+      ant.position.set(sx, 0.92, -0.76);
       ant.rotation.x = -0.8;
       g.add(ant);
       antennae.push(ant);
     }
     const legs: THREE.Object3D[] = [];
-    const legGeo = new THREE.CapsuleGeometry(0.055, 0.62, 3, 6);
+    const legGeo = new THREE.BoxGeometry(0.11, 0.64, 0.11);
     for (const sz of [-0.28, 0.06, 0.42]) {
       for (const sx of [-1, 1]) {
         const grp = new THREE.Group();
         const leg = new THREE.Mesh(legGeo, dark);
-        leg.position.y = -0.3;
+        leg.position.y = -0.32;
         grp.add(leg);
         grp.position.set(sx * 0.3, 0.5, sz);
         grp.rotation.z = sx * -0.85;
@@ -681,11 +807,10 @@ export class AntGame {
       inner.add(piv);
       this.mandibles.push(piv);
     }
-    /* abdomen detrás */
-    const abdomen = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10),
+    /* abdomen blocky detrás */
+    const abdomen = new THREE.Mesh(new RoundedBoxGeometry(0.52, 0.44, 0.66, 2, 0.12),
       new THREE.MeshStandardMaterial({ color: 0x8a3c14, roughness: 0.55 }));
     abdomen.position.set(0, 1.05 * SCALE + 0.3, 0.3);
-    abdomen.scale.set(1, 0.9, 1.3);
     inner.add(abdomen);
     /* carga visual: 2 slots sobre la espalda */
     for (let i = 0; i < 2; i++) {
@@ -1305,6 +1430,8 @@ export class AntGame {
     this.rainTimer = 95;
     this.kills = 0;
     this.counters = { deposited: 0, chambers: 0, kills: 0, milked: 0, bred: 0, waves: 0, gardens: 0, beetles: 0 };
+    this.tutStep = 0;
+    this.tutTarget = null;
     this.missionIdx = [0, 1, 2];
     this.missionBase = [0, 0, 0];
     this.legendShown = false;
@@ -2287,9 +2414,11 @@ export class AntGame {
       stats: { wave: this.wavesSurvived, food: Math.floor(this.food), kills: this.kills },
       minimap: {
         px: this.player.position.x, pz: this.player.position.z,
+        yaw: this.pYaw,
         items: mmItems, enemies: mmEnemies,
         portal: this.garden < GARDENS.length - 1 ? [0, -30] : null,
       },
+      tut: this.tutInfo(),
       garden: this.garden,
       gardenName: GARDENS[this.garden].name,
       gardenSub: GARDENS[this.garden].sub,
@@ -2325,6 +2454,8 @@ export class AntGame {
         this.updatePortal(dt);
         this.updateWorldBits(dt);
         this.checkMissions();
+        this.tutUpdate();
+        this.updateTutBeacon(dt);
         this.checkLegend();
         this.royalChamberBonus();
         this.updateCamera(dt);
