@@ -138,6 +138,16 @@ export default function GameAnt({ onExit }: { onExit?: () => void }) {
       }
       ctx.closePath(); ctx.fill(); ctx.stroke();
     }
+    /* cofre dorado */
+    if (hud.minimap.chest) {
+      const [cx, cz] = map(hud.minimap.chest[0], hud.minimap.chest[1]);
+      ctx.globalAlpha = 0.6 + Math.sin(t * 3) * 0.4;
+      ctx.fillStyle = "#ffd23e";
+      ctx.strokeStyle = "#7a5a10";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(cx, cz, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     /* comida */
     ctx.fillStyle = "#ffd23e";
     for (let i = 0; i < hud.minimap.items.length; i += 2) {
@@ -332,7 +342,7 @@ export default function GameAnt({ onExit }: { onExit?: () => void }) {
               {[
                 ["WASD", "mover"],
                 ["ESPACIO", "saltar"],
-                ["E", "recoger / morder"],
+                ["E", "depositar / morder"],
                 ["MANTÉN E", "excavar"],
                 ["U", "colonia"],
               ].map(([k, v]) => (
@@ -640,8 +650,8 @@ export default function GameAnt({ onExit }: { onExit?: () => void }) {
             <div className="mx-auto mt-4 grid max-w-sm grid-cols-2 gap-x-4 gap-y-1 text-left text-[11px] text-[#8fa4c2]">
               <span><kbd className="rounded bg-[#223350] px-1.5 py-0.5 font-display text-[10px] text-[#e9f1fc]">WASD</kbd> moverse</span>
               <span><kbd className="rounded bg-[#223350] px-1.5 py-0.5 font-display text-[10px] text-[#e9f1fc]">ESPACIO</kbd> saltar</span>
-              <span><kbd className="rounded bg-[#223350] px-1.5 py-0.5 font-display text-[10px] text-[#e9f1fc]">E</kbd> recoger / morder</span>
-              <span><kbd className="rounded bg-[#223350] px-1.5 py-0.5 font-display text-[10px] text-[#e9f1fc]">MANTÉN E</kbd> excavar / ordeñar</span>
+              <span><kbd className="rounded bg-[#223350] px-1.5 py-0.5 font-display text-[10px] text-[#e9f1fc]">E</kbd> depositar / morder</span>
+              <span><kbd className="rounded bg-[#223350] px-1.5 py-0.5 font-display text-[10px] text-[#e9f1fc]">AUTO</kbd> recoges comida al pasar</span>
               <span><kbd className="rounded bg-[#223350] px-1.5 py-0.5 font-display text-[10px] text-[#e9f1fc]">U</kbd> panel de colonia</span>
               <span>Ratón: cámara · clic para capturar</span>
             </div>

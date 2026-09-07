@@ -206,6 +206,17 @@ export class SpaceGame {
     { x: 0, z: 0, r: 3.35, y: 2.18 },     // cúpula central
   ];
 
+  /* extras grandes: satélites, planetas, cofres sorpresa, logros */
+  private planets: THREE.Mesh[] = [];
+  private planetRings: THREE.Mesh[] = [];
+  private moons: { mesh: THREE.Mesh; pivot: THREE.Group; spd: number }[] = [];
+  private blinkers: THREE.Mesh[] = [];
+  private crates: { mesh: THREE.Group; open: boolean; respawnAt: number }[] = [];
+  private achMetal = false;
+  private achBoss = false;
+  private achSector = false;
+  private achPirates = false;
+
   /* gancho */
   private towed: Debris[] = [];
   private towLines: THREE.Line[] = [];
@@ -315,6 +326,7 @@ export class SpaceGame {
 
     this.buildSky();
     this.buildStation();
+    this.buildStationExtras();
     this.buildPortal();
     this.buildDebrisAssets();
     for (let i = 0; i < 26; i++) this.spawnDebris(true);
@@ -581,6 +593,203 @@ export class SpaceGame {
     this.scene.add(this.stationCore);
   }
 
+  /* ================================================= EXTRAS GRANDES: satélites + puentes obby + planetas + torres + cofres sorpresa */
+  private buildStationExtras() {
+    const M = this.stationMats;
+    const white = M.white, darkMat = M.darkMat, cyanMat = M.cyanMat;
+    const studs = new THREE.MeshStandardMaterial({ map: this.studsTexture(), roughness: 0.7, metalness: 0.15 });
+
+    /* ---- 4 plataformas satélite caminables + 3 puentes obby ---- */
+    const sats: [number, number][] = [[0, -26], [-26, 4], [26, -2], [9, 27]];
+    for (const [sx, sz] of sats) {
+      const pad = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 5.6, 0.5, 28), studs);
+      pad.position.set(sx, -1.28, sz);
+      this.stationCore.add(pad);
+      const edge = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.11, 8, 40),
+        new THREE.MeshBasicMaterial({ color: 0x38e1d4, transparent: true, opacity: 0.55 }));
+      edge.rotation.x = Math.PI / 2;
+      edge.position.set(sx, -1.02, sz);
+      this.stationCore.add(edge);
+      /* soporte inferior + motor glow */
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.9, 5, 10), darkMat);
+      leg.position.set(sx, -3.9, sz);
+      this.stationCore.add(leg);
+      const eng = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 0.35, 1, 12),
+        new THREE.MeshBasicMaterial({ color: 0x38e1d4, transparent: true, opacity: 0.7 }));
+      eng.position.set(sx, -6.6, sz);
+      this.stationCore.add(eng);
+      this.decks.push({ x: sx, z: sz, r: 5.2, y: -1.02 });
+    }
+    /* puentes obby hacia 3 satélites (el 4º [9,27] es exclusivo de jetpack) */
+    for (const [sx, sz] of [sats[0], sats[1], sats[2]]) {
+      const len = Math.hypot(sx, sz);
+      const dx = sx / len, dz = sz / len;
+      for (let i = 1; i <= 3; i++) {
+        const r = 13.2 + i * 2.7;
+        const bx = dx * r, bz = dz * r;
+        const by = i % 2 === 1 ? -0.72 : -1.02;
+        const step = new THREE.Mesh(rbox(1.9, 0.42, 1.9, 0.05, 2), i % 2 === 1 ? cyanMat : white);
+        step.position.set(bx, by - 0.21, bz);
+        this.stationCore.add(step);
+        this.decks.push({ x: bx, z: bz, r: 1.15, y: by });
+      }
+    }
+
+    /* ---- torres de comunicaciones con balizas ---- */
+    for (const a of [0.4, 2.5, 4.5]) {
+      const tx = Math.cos(a) * 12, tz = Math.sin(a) * 12;
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.24, 4.2, 8), darkMat);
+      pole.position.set(tx, 1.1, tz);
+      this.stationCore.add(pole);
+      const dish = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.1, 0.5, 12), white);
+      dish.position.set(tx, 3.35, tz);
+      this.stationCore.add(dish);
+      const bl = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6),
+        new THREE.MeshStandardMaterial({ color: 0xff4038, emissive: 0xff2018, emissiveIntensity: 1.4 }));
+      bl.position.set(tx, 3.75, tz);
+      this.stationCore.add(bl);
+      this.blinkers.push(bl);
+    }
+
+    /* ---- 3 COFRES SORPRESA dorados ---- */
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xf4c542, emissive: 0x7a5a10, emissiveIntensity: 0.55, metalness: 0.75, roughness: 0.3 });
+    const crateAt = (x: number, z: number) => {
+      const g = new THREE.Group();
+      const box = new THREE.Mesh(rbox(1.1, 0.85, 1.1, 0.08, 2), goldMat);
+      box.position.y = 0.43;
+      g.add(box);
+      const lid = new THREE.Mesh(rbox(1.2, 0.2, 1.2, 0.08, 2), goldMat);
+      lid.position.y = 0.95;
+      g.add(lid);
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.05, 6, 22),
+        new THREE.MeshBasicMaterial({ color: 0xffe98a, transparent: true, opacity: 0.85 }));
+      halo.rotation.x = Math.PI / 2;
+      halo.position.y = 1.35;
+      g.add(halo);
+      g.position.set(x, 0, z);
+      this.stationCore.add(g);
+      this.crates.push({ mesh: g, open: false, respawnAt: 0 });
+    };
+    crateAt(0, -26);
+    crateAt(-26, 4);
+    crateAt(9, 27);
+
+    /* ---- PLANETAS gigantes visibles (sin niebla) + lunas ---- */
+    const mkPlanetTex = (base: string, bands: string[]): THREE.Texture => {
+      const c = document.createElement("canvas");
+      c.width = 128; c.height = 128;
+      const ctx = c.getContext("2d")!;
+      ctx.fillStyle = base; ctx.fillRect(0, 0, 128, 128);
+      bands.forEach((b, i) => {
+        ctx.fillStyle = b;
+        ctx.fillRect(0, (i * 128) / bands.length + 6, 128, 128 / bands.length - 12);
+      });
+      for (let i = 0; i < 40; i++) {
+        ctx.fillStyle = "rgba(255,255,255,0.10)";
+        ctx.beginPath();
+        ctx.arc(Math.random() * 128, Math.random() * 128, Math.random() * 7 + 2, 0, TAU);
+        ctx.fill();
+      }
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      return t;
+    };
+    const planetDefs: [string, string[], number, number, number, number, boolean][] = [
+      ["#c96a2e", ["#e08a3c", "#a34f1e", "#d97f2f", "#8f4218"], 17, -100, 20, -115, true],
+      ["#3fb8c9", ["#63d4e3", "#2a93a5", "#7ee0ec", "#1f7a8c"], 11, 115, -8, -90, true],
+      ["#8a4fd0", ["#a86ae8", "#6f36b0", "#b980f2", "#5c2a96"], 9, 60, 30, 125, false],
+    ];
+    for (const [base, bands, r, px, py, pz, withRing] of planetDefs) {
+      const p = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 20),
+        new THREE.MeshStandardMaterial({ map: mkPlanetTex(base, bands), roughness: 0.9, fog: false }));
+      p.position.set(px, py, pz);
+      this.scene.add(p);
+      this.planets.push(p);
+      if (withRing) {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(r * 1.55, r * 0.09, 8, 48),
+          new THREE.MeshBasicMaterial({ color: 0xd8c8a8, transparent: true, opacity: 0.6, fog: false }));
+        ring.position.copy(p.position);
+        ring.rotation.x = Math.PI / 2.4;
+        ring.rotation.y = 0.3;
+        this.scene.add(ring);
+        this.planetRings.push(ring);
+      }
+      const moonPivot = new THREE.Group();
+      moonPivot.position.copy(p.position);
+      const moon = new THREE.Mesh(new THREE.SphereGeometry(r * 0.18, 12, 10),
+        new THREE.MeshStandardMaterial({ color: 0xbfc4cc, roughness: 1, fog: false }));
+      moon.position.x = r * 2.2;
+      moonPivot.add(moon);
+      this.scene.add(moonPivot);
+      this.moons.push({ mesh: moon, pivot: moonPivot, spd: rand(0.08, 0.16) });
+    }
+  }
+
+  /** Intenta abrir un cofre sorpresa cercano. Devuelve true si abrió uno. */
+  private tryOpenCrate(): boolean {
+    const t = this.clock.elapsedTime;
+    for (const c of this.crates) {
+      if (c.open || t < c.respawnAt) continue;
+      if (c.mesh.position.distanceTo(this.player.position) < 2.6) {
+        c.open = true;
+        c.mesh.visible = false;
+        c.respawnAt = t + 90;
+        const roll = Math.random();
+        this.audio.legend();
+        this.burst(c.mesh.position.clone().setY(1), 0xffd23e, 18, 4);
+        if (roll < 0.45) {
+          const gain = 60 + Math.floor(rand(0, 61));
+          this.metal += gain;
+          this.cb.onBanner("🎁 ¡CAJA SORPRESA!", `+${gain} ✦ · chatarra premium escondida`);
+        } else if (roll < 0.78) {
+          this.o2 = this.maxO2;
+          this.hp = 100;
+          this.cb.onBanner("🎁 ¡CAJA SORPRESA!", "O2 y traje restaurados al 100%");
+        } else {
+          for (let i = 0; i < 3; i++) this.spawnDebris(true);
+          this.cb.onBanner("🎁 ¡CAJA SORPRESA!", "¡3 chatarras premium aparecidas cerca!");
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private updateExtras(dt: number, t: number) {
+    for (const p of this.planets) p.rotation.y += dt * 0.02;
+    for (const m of this.moons) m.pivot.rotation.y += dt * m.spd;
+    for (const b of this.blinkers) {
+      (b.material as THREE.MeshStandardMaterial).emissiveIntensity = Math.sin(t * 3.2) > 0.2 ? 1.6 : 0.15;
+    }
+    for (const c of this.crates) {
+      if (!c.open) {
+        c.mesh.rotation.y += dt * 0.9;
+        c.mesh.children[2].rotation.z += dt * 1.6;
+      } else if (t > c.respawnAt) {
+        c.open = false;
+        c.mesh.visible = true;
+      }
+    }
+    if (!this.achMetal && this.metal >= 500) {
+      this.achMetal = true;
+      this.audio.legend();
+      this.cb.onBanner("🏆 LOGRO: MAGNATE DEL CHATARRAL", "500 ✦ recogidas · la estación brilla gracias a ti");
+    }
+  }
+
+  private checkCombatAchievements() {
+    if (!this.achBoss && this.counters.bosses >= 1) {
+      this.achBoss = true;
+      this.audio.legend();
+      this.cb.onBanner("🏆 LOGRO: CAZANAVES", "Primera nave pirata CRUSHER destruida");
+    }
+    if (!this.achPirates && this.counters.pirates >= 25) {
+      this.achPirates = true;
+      this.audio.legend();
+      this.cb.onBanner("🏆 LOGRO: PESTA NEGRA", "25 piratas abatidos · el cinturón te respeta");
+    }
+  }
+
   /* portal de hipersalto */
   private buildPortal() {
     const g = new THREE.Group();
@@ -825,7 +1034,7 @@ export class SpaceGame {
   private onKeyDown = (e: KeyboardEvent) => {
     this.keys[e.code] = true;
     if (this.started && !this.paused && !e.repeat) {
-      if (e.code === "KeyE") this.pressAction();
+      if (e.code === "KeyE") { if (!this.tryOpenCrate()) this.pressAction(); }
       if (e.code === "Digit1") this.setTool("magnet");
       if (e.code === "Digit2") this.setTool("blaster");
       if (e.code === "Digit3") this.setTool("wrench");
@@ -1588,6 +1797,7 @@ export class SpaceGame {
     if (idx >= 0) this.pirates.splice(idx, 1);
     this.scene.remove(p.mesh);
     this.counters.pirates++;
+    this.checkCombatAchievements();
     this.burst(p.mesh.position.clone(), 0xff5040, 14, 3.4);
     this.audio.zap();
     /* botín */
@@ -1601,6 +1811,7 @@ export class SpaceGame {
       for (let i = 0; i < 3; i++) this.spawnDebris(true);
       this.cb.onBanner("☠ CRUSHER DESTRUIDA", "+140 ✦ · la chatarra premium es tuya");
       this.audio.legend();
+      this.checkCombatAchievements();
     }
   }
 
@@ -1899,6 +2110,7 @@ export class SpaceGame {
       (this.beacon.material as THREE.MeshStandardMaterial).emissiveIntensity = Math.sin(t * 2.4) > 0 ? 1.4 : 0.2;
     }
     if (this.evolutionRing?.visible) this.evolutionRing.rotation.z = t * 0.4;
+    this.updateExtras(dt, t);
   }
 
   private setModuleOff(m: StationModule, off: boolean) {
@@ -2062,6 +2274,11 @@ export class SpaceGame {
     this.warpFx = 0;
     this.sector++;
     this.counters.sectors++;
+    if (!this.achSector && this.sector >= 2) {
+      this.achSector = true;
+      this.audio.legend();
+      this.cb.onBanner("🏆 LOGRO: VIAJERO ESTELAR", "3 sectores explorados · la galaxia es tu patio");
+    }
     this.recordSector = Math.max(this.recordSector, this.sector);
     localStorage.setItem("chatarra_sector", String(this.recordSector));
     const S = SECTORS[this.sector];

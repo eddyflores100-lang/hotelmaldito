@@ -71,7 +71,7 @@ export type AntHud = {
   portal: { ready: boolean; food: number; foodGoal: number; waves: number; wavesGoal: number };
   boss: { hp: number; max: number; name: string } | null;
   eggs: number;
-  minimap: { px: number; pz: number; yaw: number; items: number[]; enemies: number[]; portal: [number, number] | null };
+  minimap: { px: number; pz: number; yaw: number; items: number[]; enemies: number[]; portal: [number, number] | null; chest: [number, number] | null };
   tut: { step: number; total: number; text: string; target: [number, number] | null } | null;
 };
 
@@ -196,6 +196,10 @@ export class AntGame {
   private tutStep = 0;
   private tutTarget: THREE.Vector3 | null = null;
   private tutBeacon: THREE.Group | null = null;
+  private ambient: { mesh: THREE.Group; kind: "butterfly" | "bee" | "ladybug"; a: number; r: number; h: number; spd: number; wings: THREE.Object3D[]; ph: number }[] = [];
+  private chest: THREE.Group | null = null;
+  private chestTimer = 60;
+  private autoPickCd = 0;
   private missionIdx = [0, 1, 2];
   private missionPool = [
     { text: "Deposita comida en el hormiguero", goal: 6, reward: 15, key: "deposited" as const },
@@ -294,6 +298,8 @@ export class AntGame {
     this.scene.add(this.particles);
 
     this.buildTutBeacon();
+    this.buildAmbientLife();
+    this.buildChest();
 
     this.record = Number(localStorage.getItem("hormiguero_record") || 0);
     this.bindEvents();
@@ -407,7 +413,7 @@ export class AntGame {
     const texts = [
       this.carry.length > 0
         ? "¡Carga lista! Llévala al NIDO (anillo verde) y pulsa [E]"
-        : "Recoge comida: acércate a hojas y migas y pulsa [E] · deposita 2 cargas",
+        : "Camina sobre hojas y migas para recogerlas solas · lleva 2 cargas al NIDO y pulsa [E]",
       "Pulsa [U] y cria un HUEVO DE OBRERA con tu comida",
       "Mantén [E] junto a un anillo de tierra para excavar una CÁMARA",
       "¡Defiende el hormiguero! Sigue al balizador y pica con [E]",
@@ -418,6 +424,148 @@ export class AntGame {
       text: texts[this.tutStep],
       target: this.tutTarget ? [this.tutTarget.x, this.tutTarget.z] : null,
     };
+  }
+
+  /* ------------------------ vida ambiental --------------------------- */
+  /** Mariposas, abejas y mariquitas que recorren el jardín sin parar. */
+  private buildAmbientLife() {
+    const addFlyer = (kind: "butterfly" | "bee", col: number, r: number, h: number, spd: number) => {
+      const g = new THREE.Group();
+      const wm = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.88, side: THREE.DoubleSide });
+      const body = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.06, 0.26, 3, 6),
+        new THREE.MeshStandardMaterial({ color: kind === "bee" ? 0x3a2c08 : 0x241812, roughness: 0.6 })
+      );
+      body.rotation.x = Math.PI / 2;
+      g.add(body);
+      if (kind === "bee") {
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.07, 0.07),
+          new THREE.MeshStandardMaterial({ color: 0xf4c542, roughness: 0.5 }));
+        stripe.position.y = 0.04;
+        g.add(stripe);
+      }
+      const wings: THREE.Object3D[] = [];
+      for (const sx of [-1, 1]) {
+        const piv = new THREE.Group();
+        const w = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.24), wm);
+        w.position.set(sx * 0.2, 0.05, 0);
+        piv.add(w);
+        g.add(piv);
+        wings.push(piv);
+      }
+      this.scene.add(g);
+      this.ambient.push({ mesh: g, kind, a: rand(0, TAU), r, h, spd, wings, ph: rand(0, TAU) });
+    };
+    addFlyer("butterfly", 0xff9ad5, 15, 2.4, 0.35);
+    addFlyer("butterfly", 0xffd23e, 22, 3.1, 0.28);
+    addFlyer("butterfly", 0x9ad8ff, 28, 2.8, 0.22);
+    addFlyer("bee", 0xf4c542, 10, 1.6, 0.5);
+    addFlyer("bee", 0xf4c542, 18, 2.0, 0.42);
+    /* mariquitas: caminan en círculos por el suelo */
+    for (let i = 0; i < 3; i++) {
+      const g = new THREE.Group();
+      const shell = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8),
+        new THREE.MeshStandardMaterial({ color: 0xd42a1e, roughness: 0.4 }));
+      shell.scale.set(1, 0.7, 1.2);
+      shell.position.y = 0.16;
+      g.add(shell);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6),
+        new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.5 }));
+      head.position.set(0, 0.14, -0.24);
+      g.add(head);
+      for (const sx of [-0.08, 0.08]) {
+        const dot = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 5),
+          new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
+        dot.position.set(sx, 0.3, 0.05);
+        g.add(dot);
+      }
+      const a0 = rand(0, TAU);
+      g.position.set(Math.cos(a0) * rand(10, 30), 0, Math.sin(a0) * rand(10, 30));
+      this.scene.add(g);
+      this.ambient.push({ mesh: g, kind: "ladybug", a: a0, r: rand(4, 8), h: 0, spd: rand(0.4, 0.7), wings: [], ph: rand(0, TAU) });
+    }
+  }
+
+  private updateAmbient(dt: number) {
+    const t = this.clock.elapsedTime;
+    for (const a of this.ambient) {
+      a.a += a.spd * dt;
+      if (a.kind === "ladybug") {
+        a.mesh.position.set(Math.cos(a.a) * a.r + 6, 0, Math.sin(a.a) * a.r - 4);
+        a.mesh.rotation.y = -a.a + Math.PI / 2;
+      } else {
+        a.mesh.position.set(Math.cos(a.a) * a.r, a.h + Math.sin(t * 1.8 + a.ph) * 0.45, Math.sin(a.a) * a.r);
+        a.mesh.rotation.y = -a.a + Math.PI / 2;
+        const flap = Math.sin(t * (a.kind === "bee" ? 22 : 12) + a.ph) * 0.65;
+        a.wings[0] && (a.wings[0].rotation.z = flap);
+        a.wings[1] && (a.wings[1].rotation.z = -flap);
+      }
+    }
+  }
+
+  /** Cofre dorado que aparece cada cierto tiempo: tócalo para una recompensa. */
+  private buildChest() {
+    const g = new THREE.Group();
+    const gold = new THREE.MeshStandardMaterial({ color: 0xf4c542, emissive: 0x8a6a10, emissiveIntensity: 0.6, metalness: 0.7, roughness: 0.3 });
+    const box = new THREE.Mesh(new RoundedBoxGeometry(1.1, 0.8, 1.1, 2, 0.1), gold);
+    box.position.y = 0.4;
+    g.add(box);
+    const lid = new THREE.Mesh(new RoundedBoxGeometry(1.2, 0.22, 1.2, 2, 0.1), gold);
+    lid.position.y = 0.9;
+    g.add(lid);
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.05, 6, 22),
+      new THREE.MeshBasicMaterial({ color: 0xffe98a, transparent: true, opacity: 0.85 }));
+    halo.rotation.x = Math.PI / 2;
+    halo.position.y = 1.4;
+    g.add(halo);
+    g.visible = false;
+    this.scene.add(g);
+    this.chest = g;
+  }
+
+  private updateChest(dt: number) {
+    if (!this.chest) return;
+    if (this.chest.visible) {
+      this.chest.rotation.y += dt * 1.2;
+      this.chest.children[2].rotation.z = Math.sin(this.clock.elapsedTime * 3) * 0.3;
+      if (this.chest.position.distanceTo(this.player.position) < 1.9) {
+        this.chest.visible = false;
+        this.chestTimer = rand(70, 110);
+        const mult = this.chambers.get("granero")!.built ? 1.25 : 1;
+        const gain = Math.round(45 * mult);
+        this.food += gain;
+        this.gardenFood += gain;
+        this.audio.legend();
+        this.burst(this.chest.position.clone().setY(1), 0xffd23e, 16, 4);
+        this.cb.onBanner("🎁 ¡COFRE DORADO!", `+${gain} 🍃 · ¡sorpresa del jardín!`);
+      }
+    } else {
+      this.chestTimer -= dt;
+      if (this.chestTimer <= 0) {
+        const a = rand(0, TAU);
+        const r = rand(12, 34);
+        this.chest.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
+        this.chest.visible = true;
+        this.audio.breed();
+        this.cb.onToast("¡Ha aparecido un COFRE DORADO! Búscalo en el mapa ✨", "info");
+      }
+    }
+  }
+
+  /** Recogida automática al pasar sobre la comida (estilo simulador Roblox). */
+  private autoPickup(dt: number) {
+    this.autoPickCd -= dt;
+    if (this.autoPickCd > 0 || this.carry.length >= 2) return;
+    const item = this.nearItem();
+    if (item) {
+      item.taken = true;
+      item.mesh.visible = false;
+      item.respawnAt = this.clock.elapsedTime + 14;
+      this.carry.push({ kind: item.kind, value: ITEM_VALUE[item.kind] });
+      this.setCarryVisual();
+      this.audio.pickup();
+      this.autoPickCd = 0.5;
+    }
   }
 
   /* ------------------------------ mundo ------------------------------ */
@@ -2417,6 +2565,7 @@ export class AntGame {
         yaw: this.pYaw,
         items: mmItems, enemies: mmEnemies,
         portal: this.garden < GARDENS.length - 1 ? [0, -30] : null,
+        chest: this.chest?.visible ? [this.chest.position.x, this.chest.position.z] : null,
       },
       tut: this.tutInfo(),
       garden: this.garden,
@@ -2456,6 +2605,9 @@ export class AntGame {
         this.checkMissions();
         this.tutUpdate();
         this.updateTutBeacon(dt);
+        this.autoPickup(dt);
+        this.updateAmbient(dt);
+        this.updateChest(dt);
         this.checkLegend();
         this.royalChamberBonus();
         this.updateCamera(dt);
